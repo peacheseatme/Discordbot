@@ -1,0 +1,8 @@
+By agreeing to this license you are able to use this bot. Using bot without license signage will result in something. IDK
+
+This bot license is held by Nightmare.
+He is the only person besides the developer who may use, change, or run this code in anyway.
+License extension to another idividual may only be done with premission from the bot's developer.
+License extension NOT guaranteed.
+
+Sign name on next line to agree to this license:
