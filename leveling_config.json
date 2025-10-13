@@ -1,0 +1,22 @@
+{
+  "123456789012345678": {
+    "per_message": 15,
+    "per_minute_vc": 10,
+    "per_reaction": 5,
+    "per_vote": 20
+  },
+  "987654321098765432": {
+    "per_message": 10,
+    "per_minute_vc": 6,
+    "per_reaction": 3,
+    "per_vote": 15
+  },
+  "1384771470860746753": {
+    "message_xp": 1,
+    "reaction_xp": 5,
+    "vc_minute_xp": 4,
+    "poll_vote_xp": 8,
+    "base_xp": 10,
+    "xp_scale": 1.1
+  }
+}

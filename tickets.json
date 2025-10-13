@@ -1,0 +1,31 @@
+{
+    "123456789012345678": {
+        "ticket_channel": 987654321098765432,
+        "support_roles": [
+            111111111111111111,
+            222222222222222222
+        ],
+        "tickets": {
+            "555555555555555555": {
+                "user": 444444444444444444,
+                "claimed_by": 111111111111111111,
+                "messages": [
+                    {
+                        "author": "User#1234",
+                        "content": "Hello, I need help!"
+                    },
+                    {
+                        "author": "Support#5678",
+                        "content": "Sure, what\u2019s the issue?"
+                    }
+                ]
+            }
+        }
+    },
+    "1384771470860746753": {
+        "category_id": 1427018916642684958,
+        "support_roles": [
+            1387105779353653388
+        ]
+    }
+}

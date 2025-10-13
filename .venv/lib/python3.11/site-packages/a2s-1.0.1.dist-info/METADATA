@@ -1,0 +1,48 @@
+Metadata-Version: 2.1
+Name: a2s
+Version: 1.0.1
+Summary: Convert python async function to a sync function for calling from a normal function in an existing event loop
+Home-page: https://github.com/plter/a2s
+Author: plter
+Author-email: xtiqin@163.com
+License: UNKNOWN
+Project-URL: Bug Tracker, https://github.com/plter/a2s/issues
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# a2s
+
+Python async function to sync function, Convert python async function to a sync function for calling from a normal
+function in an existing event loop
+
+# Usage
+
+```python
+import asyncio
+from a2s import sync
+
+
+@sync
+async def an_async_func():
+    print("Hello World")
+
+
+def a_sync_func():
+    an_async_func()
+    pass
+
+
+async def main():
+    a_sync_func()
+    pass
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+

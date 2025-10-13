@@ -1,0 +1,23 @@
+{
+  "arkserver": {
+    "ip": "192.168.1.55",
+    "port": 27015,
+    "game": "ark"
+  },
+  "rustbase": {
+    "ip": "example.com",
+    "port": 28015,
+    "game": "rust"
+  },
+  "uslong3.rustafied.com": {
+    "host": "uslong3.rustafied.com",
+    "port": 28015,
+    "game": "rust"
+  },
+  "rust1": {
+    "host": "uslong3.rustafied.com",
+    "game_port": 28015,
+    "query_port": 28018,
+    "game": "rust"
+  }
+}

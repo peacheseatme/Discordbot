@@ -1,0 +1,33 @@
+{
+  "1384771470860746753": {
+    "channel_id": 1387113647687335946,
+    "notify_role": 1386830860334141500,
+    "approval_role": 1386830860334141500,
+    "pass_role": 1387105779353653388,
+    "questions": [
+      "What is your real name?",
+      "How old are you?",
+      "Why do you want to join the staff team?",
+      "What experience do you have with moderation?",
+      "Are you willing to follow the server rules?",
+      "What games are you applying for? Or just the Discord server?",
+      "If someone harassed another player, what would you do?",
+      "If an admin was abusing power, what would you do?",
+      "On a scale of 1\u201310, how would you rate this server?",
+      "drytrytbytb"
+    ],
+    "enabled": true,
+    "review_role": 1388542977537998888
+  },
+  "1212210181044183171": {
+    "channel_id": 1217441097794584658,
+    "notify_role": 1212455526143758406,
+    "approval_role": 1212455526143758406,
+    "pass_role": 1379687525576212572,
+    "questions": [
+      "Are you good at Fortnite?",
+      "Can you Fart?"
+    ],
+    "enabled": true
+  }
+}

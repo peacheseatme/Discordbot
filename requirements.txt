@@ -1,0 +1,6 @@
+discord.py
+python-dotenv
+uwuify
+pet-pet-gif
+moviepy
+
