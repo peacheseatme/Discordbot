@@ -1,0 +1,5 @@
+1. Install Python .3.12.7. or greater.
+2. In a Python terminal, install contents of file requirements.txt.
+3. Install bot to server by pasting URL into bar and authorizing the bot: https://discord.com/oauth2/authorize?client_id=1379645937064087563
+4. Sign license.
+5. Run "Bot.py"
