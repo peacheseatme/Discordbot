@@ -1,15 +1,8 @@
 {
-  "guilds": {
     "123456789012345678": {
-      "enabled": true,
-      "channel_id": "987654321098765432",
-      "verified_role": "112233445566778899",
-      "method": "reaction",
-      "reaction": {
-        "message_id": null,
-        "emoji": "✅",
-        "setup_complete": false
-      }
+        "method": "color",
+        "verified_role": 987654321098765432,
+        "verify_channel": 876543210987654321,
+        "log_channel": 765432109876543210
     }
-  }
 }

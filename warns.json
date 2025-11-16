@@ -1,25 +1,16 @@
 {
-  "1212210181044183171": {
-    "839410938410938410": [
-      "Spamming (issued by Gavin)",
-      "Inappropriate language (issued by Mod123)"
-    ],
-    "1212790116838412341": [
-      "test (issued by Captain Viktor Vodkanov)"
-    ]
-  },
-  "987654321098765432": {
-    "112233445566778899": [
-      "Trolling (issued by AdminJoe)"
-    ]
-  },
-  "1384771470860746753": {
-    "1212790116838412341": [
-      "test 2 (issued by Captain Viktor Vodkanov)"
-    ],
-    "1260680373558579274": [
-      "dont do that again (issued by Captain Viktor Vodkanov)",
-      "hitler reference (issued by Captain Viktor Vodkanov)"
-    ]
-  }
+    "1212210181044183171": {
+        "839410938410938410": [
+            "Spamming (issued by Gavin)",
+            "Inappropriate language (issued by Mod123)"
+        ],
+        "1212790116838412341": [
+            "test (issued by Captain Viktor Vodkanov)"
+        ]
+    },
+    "987654321098765432": {
+        "112233445566778899": [
+            "Trolling (issued by AdminJoe)"
+        ]
+    }
 }

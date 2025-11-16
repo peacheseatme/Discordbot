@@ -1,0 +1,15 @@
+{
+    "guild_id": {
+        "replace_old_roles": false,
+        "rewards": {
+            "5": {
+                "role_id": 1234567890,
+                "message": "\ud83c\udf89 Congrats {user}, you reached level 5 and unlocked {role}!"
+            },
+            "10": {
+                "role_id": 2345678901,
+                "message": "\ud83d\udd25 Amazing {user}, welcome to level 10!"
+            }
+        }
+    }
+}

@@ -10,13 +10,5 @@
         "level": 2,
         "next_level_xp": 200,
         "background": "USER_ID_2.raw.mp4"
-    },
-    "1384771470860746753": {
-        "message_xp": 2,
-        "reaction_xp": 5,
-        "vc_minute_xp": 4,
-        "poll_vote_xp": 8,
-        "base_xp": 10,
-        "xp_scale": 1.2
     }
 }
