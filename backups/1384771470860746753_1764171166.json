@@ -1,0 +1,30 @@
+{
+    "meta": {
+        "id": 1384771470860746753,
+        "name": "Coffeecord Support Server",
+        "timestamp": 1764171166
+    },
+    "files": {
+        "xp.json": {
+            "1384771470860746753": {
+                "1168282467162136656": {
+                    "xp": 0,
+                    "level": 1,
+                    "next_level_xp": 11
+                }
+            }
+        },
+        "automod.json": {
+            "1384771470860746753": {
+                "blocked_words": [
+                    "67"
+                ],
+                "max_mentions": 3,
+                "punishment": "warn",
+                "spam_filter": true,
+                "invite_block": true,
+                "enabled": true
+            }
+        }
+    }
+}

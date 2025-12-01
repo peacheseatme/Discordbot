@@ -1,16 +1,5 @@
 {
-    "1212210181044183171": {
-        "839410938410938410": [
-            "Spamming (issued by Gavin)",
-            "Inappropriate language (issued by Mod123)"
-        ],
-        "1212790116838412341": [
-            "test (issued by Captain Viktor Vodkanov)"
-        ]
-    },
-    "987654321098765432": {
-        "112233445566778899": [
-            "Trolling (issued by AdminJoe)"
-        ]
-    }
+    "reason": "AutoMod: Blocked word: 67",
+    "warned_by": "AutoMod",
+    "timestamp": "2025-11-26 15:32:02 UTC"
 }
