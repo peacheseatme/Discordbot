@@ -1,11 +1,13 @@
 COFFEECORD — INSTALLATION & USAGE
 ==================================
 
-FIRST-TIME SETUP (run once from the project root):
+FIRST-TIME SETUP:
 
   bash install.sh
 
   This will:
+    - Clone https://github.com/peacheseatme/Discordbot.git to ~/Discordbot
+      if this installer is not running inside an already-cloned repo
     - Check your Python version (3.12+ required)
     - Create a virtual environment at .venv/
     - Install all dependencies from requirements.txt

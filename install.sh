@@ -15,9 +15,41 @@ warn()    { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
 error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
 header()  { echo -e "\n${BOLD}${CYAN}$*${RESET}"; }
 
+# ── Repository bootstrap settings ─────────────────────────────
+REPO_URL="https://github.com/peacheseatme/Discordbot.git"
+REPO_DIR_NAME="Discordbot"
+
 # ── Locate the project root (the directory containing this script) ──
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+
+# ── Bootstrap clone if installer is not running from a repo clone ──
+if ! git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+   || [ ! -f "$SCRIPT_DIR/Main/Bot.py" ] \
+   || [ ! -f "$SCRIPT_DIR/bot.sh" ]; then
+    if ! command -v git >/dev/null 2>&1; then
+        error "git is required to clone the repository but was not found."
+        exit 1
+    fi
+
+    TARGET_DIR="${COFFEECORD_INSTALL_DIR:-$HOME/$REPO_DIR_NAME}"
+    PARENT_DIR="$(dirname "$TARGET_DIR")"
+    mkdir -p "$PARENT_DIR"
+
+    echo ""
+    header "Bootstrap — Preparing repository"
+
+    if [ -d "$TARGET_DIR/.git" ]; then
+        info "Repository already cloned at $TARGET_DIR"
+    else
+        info "Cloning repository to $TARGET_DIR"
+        git clone "$REPO_URL" "$TARGET_DIR"
+        success "Repository cloned."
+    fi
+
+    info "Re-running installer from cloned repository..."
+    exec bash "$TARGET_DIR/install.sh" "$@"
+fi
 
 echo ""
 echo -e "${BOLD}${CYAN}╔══════════════════════════════════════╗${RESET}"
