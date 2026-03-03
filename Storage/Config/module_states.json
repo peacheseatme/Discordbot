@@ -1,0 +1,23 @@
+{
+  "1384771470860746753": {
+    "automod": true,
+    "logging": true,
+    "tickets": true,
+    "translate": true,
+    "reactionrole": true,
+    "autorole": true,
+    "welcome_leave": true,
+    "setup_wizard": true,
+    "leveling": true,
+    "kofi": true,
+    "verification": true,
+    "polls": true,
+    "applications": true,
+    "adaptive_slowmode": true,
+    "muterole": true,
+    "calls": true,
+    "nickname": true,
+    "support": true,
+    "modules_cmd": true
+  }
+}

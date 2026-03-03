@@ -1,0 +1,43 @@
+COFFEECORD — INSTALLATION & USAGE
+==================================
+
+FIRST-TIME SETUP (run once from the project root):
+
+  bash install.sh
+
+  This will:
+    - Check your Python version (3.12+ required)
+    - Create a virtual environment at .venv/
+    - Install all dependencies from requirements.txt
+    - Ask for your Discord bot token and write Main/.env
+    - Install the 'c-cord' command to ~/.local/bin/
+    - Add ~/.local/bin to your PATH (if needed)
+    - Verify the bot files have no syntax errors
+
+  After install.sh finishes, restart your terminal once so the
+  'c-cord' command is available in your PATH.
+
+INVITE THE BOT TO YOUR SERVER:
+  https://discord.com/oauth2/authorize?client_id=1379645937064087563&permissions=8&scope=bot+applications.commands
+
+DAILY USAGE (from anywhere in your terminal, after setup):
+
+  c-cord start        — Start the bot in the background
+  c-cord stop         — Stop the bot gracefully
+  c-cord restart      — Restart the bot
+  c-cord status       — Show whether the bot is running + uptime
+  c-cord logs         — Watch live bot output  (Ctrl+C to exit)
+  c-cord logs -n 50   — Print the last 50 log lines
+  c-cord update       — Pull latest changes, update deps, restart
+
+  You do NOT need to activate the virtual environment manually.
+  You do NOT need to cd into the project directory.
+  Just type c-cord from any directory.
+
+KO-FI INTEGRATION (optional, disabled by default):
+  Open Main/.env and uncomment the KOFI_VERIFICATION_TOKEN and
+  KOFI_PORT lines, fill in your token, then run: c-cord restart
+
+LOGS ARE SAVED TO:
+  Storage/Logs/bot.log        (current run, appended)
+  Storage/Logs/bot_*.log      (rotated archives, max 5 kept)

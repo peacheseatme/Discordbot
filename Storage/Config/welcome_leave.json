@@ -1,0 +1,34 @@
+{
+  "1384771470860746753": {
+    "welcome": {
+      "enabled": true,
+      "channel_id": 1386804649839038484,
+      "message": "Welcome {user_mention}! Take a look around and make sure you read teh rules!",
+      "embed_enabled": true
+    },
+    "leave": {
+      "enabled": true,
+      "channel_id": 1386804649839038484,
+      "message": "Were sorry to use you go {user_name.}",
+      "embed_enabled": true,
+      "exit_survey_enabled": true,
+      "exit_survey_log_channel_id": null
+    }
+  },
+  "1476341182182195351": {
+    "welcome": {
+      "enabled": true,
+      "channel_id": 1477809276608184380,
+      "message": "Welcome {user_mention} to {server_name}! We now have {member_count} members.",
+      "embed_enabled": true
+    },
+    "leave": {
+      "enabled": true,
+      "channel_id": 1477809276608184380,
+      "message": "We're sad to see you go {user_name}!",
+      "embed_enabled": true,
+      "exit_survey_enabled": true,
+      "exit_survey_log_channel_id": 1477812981470466090
+    }
+  }
+}

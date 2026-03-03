@@ -1,0 +1,14 @@
+{
+  "1168282467162136656": {
+    "language": "en",
+    "live_translate": true,
+    "ephemeral": false,
+    "dm_delivery": false
+  },
+  "1212790116838412341": {
+    "language": "en",
+    "live_translate": false,
+    "ephemeral": true,
+    "dm_delivery": false
+  }
+}

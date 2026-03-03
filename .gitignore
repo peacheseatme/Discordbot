@@ -1,1 +1,43 @@
-.venv
+# Virtual environment
+.venv/
+venv/
+
+# Environment / secrets
+.env
+Main/.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# IDE / editor
+.cursor/
+.vscode/
+*.swp
+*.swo
+
+# Logs & temp runtime files
+Storage/Logs/
+Storage/Temp/
+*.log
+
+# Backups (large data files)
+Storage/Backups/
+
+# Secret files
+*.env
+Storage/Data/ticket.env
+
+# Temporary media generated at runtime
+temp_*.mp4
+temp_*.png
+temp_*.jpg
+
+# Compiled fonts / assets not needed in repo
+*.ttf
+
+# Old root-level data files (migrated to Storage/)
+*.json
+!Storage/Config/*.json
+!Storage/Data/*.json

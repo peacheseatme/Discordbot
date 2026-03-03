@@ -1,0 +1,53 @@
+{
+  "1384771470860746753": {
+    "enabled": true,
+    "default_mode": "button",
+    "default_logging": true,
+    "messages": {
+      "1477689555040731247": {
+        "channel_id": 1386486864264957952,
+        "mode": "button",
+        "content": "c",
+        "embed": {
+          "title": "d",
+          "description": "e",
+          "color": 5793266
+        },
+        "mappings": [
+          {
+            "id": "map_7b1a40a5",
+            "role_id": 1386795218195578930,
+            "label": "Toggle Role",
+            "emoji": "Toggle Role"
+          }
+        ],
+        "max_roles": 0,
+        "required_role_ids": [],
+        "remove_others": false,
+        "logging": true
+      },
+      "1477690285436960808": {
+        "channel_id": 1386486864264957952,
+        "mode": "button",
+        "content": "Click This Button",
+        "embed": {
+          "title": "Idk",
+          "description": "figure it out",
+          "color": 5793266
+        },
+        "mappings": [
+          {
+            "id": "map_789eccd6",
+            "role_id": 1387105779353653388,
+            "label": "Toggle Role",
+            "emoji": null
+          }
+        ],
+        "max_roles": 0,
+        "required_role_ids": [],
+        "remove_others": false,
+        "logging": true
+      }
+    }
+  }
+}

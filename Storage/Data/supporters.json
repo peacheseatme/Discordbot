@@ -1,0 +1,100 @@
+{
+  "supporters": {
+    "1212790116838412341": {
+      "discord_id": 1212790116838412341,
+      "active": true,
+      "email": "mikasayeagerlol919@gmail.com",
+      "tier": "donation",
+      "first_seen": "2026-02-21T05:18:19",
+      "last_payment": "2026-02-21T05:18:19",
+      "total_usd": 0.0,
+      "kofi_transaction_ids": []
+    },
+    "1168282467162136656": {
+      "discord_id": 1168282467162136656,
+      "active": true,
+      "email": "gavinredmond421@gmail.com",
+      "tier": "donation",
+      "first_seen": "2026-02-21T16:24:51",
+      "last_payment": "2026-02-22T03:11:42",
+      "total_usd": 5.0,
+      "kofi_transaction_ids": [
+        "test-curl-123"
+      ]
+    }
+  },
+  "unlinked_donations": [
+    {
+      "email": "jo.example@example.com",
+      "amount": "3.00",
+      "amount_usd": 3.0,
+      "timestamp": "2026-02-21T05:40:32Z",
+      "kofi_transaction_id": "00000000-1111-2222-3333-444444444444",
+      "is_subscription_payment": false
+    },
+    {
+      "email": "jo.example@example.com",
+      "amount": "3.00",
+      "amount_usd": 3.0,
+      "timestamp": "2026-02-21T05:40:36Z",
+      "kofi_transaction_id": "00000000-1111-2222-3333-444444444444",
+      "is_subscription_payment": true
+    },
+    {
+      "email": "jo.example@example.com",
+      "amount": "3.00",
+      "amount_usd": 3.0,
+      "timestamp": "2026-02-21T05:44:17Z",
+      "kofi_transaction_id": "00000000-1111-2222-3333-444444444444",
+      "is_subscription_payment": false
+    },
+    {
+      "email": "jo.example@example.com",
+      "amount": "27.95",
+      "amount_usd": 27.95,
+      "timestamp": "2026-02-21T05:45:23Z",
+      "kofi_transaction_id": "00000000-1111-2222-3333-444444444444",
+      "is_subscription_payment": false
+    },
+    {
+      "email": "jo.example@example.com",
+      "amount": "3.00",
+      "amount_usd": 3.0,
+      "timestamp": "2026-02-21T05:45:25Z",
+      "kofi_transaction_id": "00000000-1111-2222-3333-444444444444",
+      "is_subscription_payment": true
+    },
+    {
+      "email": "jo.example@example.com",
+      "amount": "3.00",
+      "amount_usd": 3.0,
+      "timestamp": "2026-02-21T05:45:26Z",
+      "kofi_transaction_id": "00000000-1111-2222-3333-444444444444",
+      "is_subscription_payment": false
+    },
+    {
+      "email": "jo.example@example.com",
+      "amount": "3.00",
+      "amount_usd": 3.0,
+      "timestamp": "2026-02-21T05:48:29Z",
+      "kofi_transaction_id": "00000000-1111-2222-3333-444444444444",
+      "is_subscription_payment": false
+    },
+    {
+      "email": "gavinredmond421@gmail.com.com",
+      "amount": "5.00",
+      "amount_usd": 5.0,
+      "timestamp": "2025-06-15T12:00:00",
+      "kofi_transaction_id": "test-curl-123",
+      "is_subscription_payment": false
+    },
+    {
+      "email": "gavinredmond421@gmail.com.com",
+      "amount": "5.00",
+      "amount_usd": 5.0,
+      "timestamp": "2025-06-15T12:00:00",
+      "kofi_transaction_id": "test-curl-123",
+      "is_subscription_payment": false
+    }
+  ]
+}
