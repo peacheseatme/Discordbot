@@ -1,6 +1,24 @@
 {
   "modules": [
     {
+      "id": "adaptive_slowmode",
+      "extension": "Modules.adaptive_slowmode",
+      "path": "Modules/adaptive_slowmode.py",
+      "display_name": "Adaptive Slowmode",
+      "description": "Adaptive slowmode configuration and trigger handling.",
+      "default_enabled": true,
+      "category": "moderation"
+    },
+    {
+      "id": "applications",
+      "extension": "Modules.applications",
+      "path": "Modules/applications.py",
+      "display_name": "Applications",
+      "description": "Staff application questions, submissions, and review actions.",
+      "default_enabled": true,
+      "category": "utilities"
+    },
+    {
       "id": "automod",
       "extension": "Modules.automod",
       "path": "Modules/automod.py",
@@ -10,6 +28,42 @@
       "category": "moderation"
     },
     {
+      "id": "autorole",
+      "extension": "Modules.autorole",
+      "path": "Modules/autorole.py",
+      "display_name": "Auto Roles",
+      "description": "Rule-based automatic role assignment.",
+      "default_enabled": true,
+      "category": "configuration"
+    },
+    {
+      "id": "calls",
+      "extension": "Modules.calls",
+      "path": "Modules/calls.py",
+      "display_name": "Calls",
+      "description": "Private call channels and call membership management.",
+      "default_enabled": true,
+      "category": "utilities"
+    },
+    {
+      "id": "kofi",
+      "extension": "Modules.kofi",
+      "path": "Modules/kofi.py",
+      "display_name": "Ko-fi Supporters",
+      "description": "Ko-fi linking/claims, supporter state, and webhook helpers.",
+      "default_enabled": true,
+      "category": "integrations"
+    },
+    {
+      "id": "leveling",
+      "extension": "Modules.leveling",
+      "path": "Modules/leveling.py",
+      "display_name": "Leveling & XP",
+      "description": "XP gain, level-up logic, rewards, and level cards.",
+      "default_enabled": true,
+      "category": "engagement"
+    },
+    {
       "id": "logging",
       "extension": "Modules.logging",
       "path": "Modules/logging.py",
@@ -17,6 +71,69 @@
       "description": "Server event and module action logging.",
       "default_enabled": true,
       "category": "configuration"
+    },
+    {
+      "id": "modules_cmd",
+      "extension": "Modules.modules_cmd",
+      "path": "Modules/modules_cmd.py",
+      "display_name": "Module Controls",
+      "description": "Per-server module visibility and toggle commands.",
+      "default_enabled": true,
+      "category": "configuration"
+    },
+    {
+      "id": "muterole",
+      "extension": "Modules.muterole",
+      "path": "Modules/muterole.py",
+      "display_name": "Mute Role",
+      "description": "Mute role creation and configuration commands.",
+      "default_enabled": true,
+      "category": "moderation"
+    },
+    {
+      "id": "nickname",
+      "extension": "Modules.nickname",
+      "path": "Modules/nickname.py",
+      "display_name": "Nickname",
+      "description": "Nickname management commands and related checks.",
+      "default_enabled": true,
+      "category": "utilities"
+    },
+    {
+      "id": "polls",
+      "extension": "Modules.polls",
+      "path": "Modules/polls.py",
+      "display_name": "Polls",
+      "description": "Poll creation, voting, and poll lifecycle events.",
+      "default_enabled": true,
+      "category": "engagement"
+    },
+    {
+      "id": "reactionrole",
+      "extension": "Modules.reactionrole",
+      "path": "Modules/reactionrole.py",
+      "display_name": "Reaction Roles",
+      "description": "Reaction/button based self-role assignment.",
+      "default_enabled": true,
+      "category": "configuration"
+    },
+    {
+      "id": "setup_wizard",
+      "extension": "Modules.setup_wizard",
+      "path": "Modules/setup_wizard.py",
+      "display_name": "Setup Wizard",
+      "description": "Interactive server setup wizard.",
+      "default_enabled": true,
+      "category": "configuration"
+    },
+    {
+      "id": "support",
+      "extension": "Modules.support",
+      "path": "Modules/support.py",
+      "display_name": "Support Us",
+      "description": "Support information, perks, and support links command.",
+      "default_enabled": true,
+      "category": "integrations"
     },
     {
       "id": "tickets",
@@ -37,60 +154,6 @@
       "category": "utilities"
     },
     {
-      "id": "reactionrole",
-      "extension": "Modules.reactionrole",
-      "path": "Modules/reactionrole.py",
-      "display_name": "Reaction Roles",
-      "description": "Reaction/button based self-role assignment.",
-      "default_enabled": true,
-      "category": "configuration"
-    },
-    {
-      "id": "autorole",
-      "extension": "Modules.autorole",
-      "path": "Modules/autorole.py",
-      "display_name": "Auto Roles",
-      "description": "Rule-based automatic role assignment.",
-      "default_enabled": true,
-      "category": "configuration"
-    },
-    {
-      "id": "welcome_leave",
-      "extension": "Modules.welcome_leave",
-      "path": "Modules/welcome_leave.py",
-      "display_name": "Welcome & Leave",
-      "description": "Welcome/leave messages and optional exit surveys.",
-      "default_enabled": true,
-      "category": "configuration"
-    },
-    {
-      "id": "setup_wizard",
-      "extension": "Modules.setup_wizard",
-      "path": "Modules/setup_wizard.py",
-      "display_name": "Setup Wizard",
-      "description": "Interactive server setup wizard.",
-      "default_enabled": true,
-      "category": "configuration"
-    },
-    {
-      "id": "leveling",
-      "extension": "Modules.leveling",
-      "path": "Modules/leveling.py",
-      "display_name": "Leveling & XP",
-      "description": "XP gain, level-up logic, rewards, and level cards.",
-      "default_enabled": true,
-      "category": "engagement"
-    },
-    {
-      "id": "kofi",
-      "extension": "Modules.kofi",
-      "path": "Modules/kofi.py",
-      "display_name": "Ko-fi Supporters",
-      "description": "Ko-fi linking/claims, supporter state, and webhook helpers.",
-      "default_enabled": true,
-      "category": "integrations"
-    },
-    {
       "id": "verification",
       "extension": "Modules.verification",
       "path": "Modules/verification.py",
@@ -100,74 +163,11 @@
       "category": "moderation"
     },
     {
-      "id": "polls",
-      "extension": "Modules.polls",
-      "path": "Modules/polls.py",
-      "display_name": "Polls",
-      "description": "Poll creation, voting, and poll lifecycle events.",
-      "default_enabled": true,
-      "category": "engagement"
-    },
-    {
-      "id": "applications",
-      "extension": "Modules.applications",
-      "path": "Modules/applications.py",
-      "display_name": "Applications",
-      "description": "Staff application questions, submissions, and review actions.",
-      "default_enabled": true,
-      "category": "utilities"
-    },
-    {
-      "id": "adaptive_slowmode",
-      "extension": "Modules.adaptive_slowmode",
-      "path": "Modules/adaptive_slowmode.py",
-      "display_name": "Adaptive Slowmode",
-      "description": "Adaptive slowmode configuration and trigger handling.",
-      "default_enabled": true,
-      "category": "moderation"
-    },
-    {
-      "id": "muterole",
-      "extension": "Modules.muterole",
-      "path": "Modules/muterole.py",
-      "display_name": "Mute Role",
-      "description": "Mute role creation and configuration commands.",
-      "default_enabled": true,
-      "category": "moderation"
-    },
-    {
-      "id": "calls",
-      "extension": "Modules.calls",
-      "path": "Modules/calls.py",
-      "display_name": "Calls",
-      "description": "Private call channels and call membership management.",
-      "default_enabled": true,
-      "category": "utilities"
-    },
-    {
-      "id": "nickname",
-      "extension": "Modules.nickname",
-      "path": "Modules/nickname.py",
-      "display_name": "Nickname",
-      "description": "Nickname management commands and related checks.",
-      "default_enabled": true,
-      "category": "utilities"
-    },
-    {
-      "id": "support",
-      "extension": "Modules.support",
-      "path": "Modules/support.py",
-      "display_name": "Support Us",
-      "description": "Support information, perks, and support links command.",
-      "default_enabled": true,
-      "category": "integrations"
-    },
-    {
-      "id": "modules_cmd",
-      "extension": "Modules.modules_cmd",
-      "path": "Modules/modules_cmd.py",
-      "display_name": "Module Controls",
-      "description": "Per-server module visibility and toggle commands.",
+      "id": "welcome_leave",
+      "extension": "Modules.welcome_leave",
+      "path": "Modules/welcome_leave.py",
+      "display_name": "Welcome & Leave",
+      "description": "Welcome/leave messages and optional exit surveys.",
       "default_enabled": true,
       "category": "configuration"
     }

@@ -1,5 +1,6 @@
 discord.py>=2.6.4
 python-dotenv>=1.0.0
+setuptools>=69.0,<75
 Pillow>=10.0.0
 pet-pet-gif>=1.0.2
 yt-dlp>=2024.1.1
