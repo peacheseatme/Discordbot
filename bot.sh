@@ -17,6 +17,7 @@ PIP_BIN="${VENV_DIR}/bin/pip"
 
 BOT_ENTRY="${SCRIPT_DIR}/Main/Bot.py"
 ENV_FILE="${SCRIPT_DIR}/Main/.env"
+TICKET_ENV_FILE="${SCRIPT_DIR}/Main/ticket.env"
 LOG_DIR="${SCRIPT_DIR}/Storage/Logs"
 TEMP_DIR="${SCRIPT_DIR}/Storage/Temp"
 PID_FILE="${TEMP_DIR}/bot.pid"
@@ -26,12 +27,49 @@ MAX_LOG_BYTES=$((10 * 1024 * 1024))
 MAX_ROTATED=5
 
 _usage() {
-    echo "Usage: ./bot.sh <command>"
-    echo "Commands: start | stop | restart | status | logs | update"
+    echo -e "${BOLD}Usage:${RESET} c-cord <command> [flags]"
+    echo ""
+    echo -e "${BOLD}Commands:${RESET}"
+    echo "  start                     Start bot in the background"
+    echo "  start -f / --force        Start — ignore non-fatal errors"
+    echo ""
+    echo "  stop                      Graceful stop (SIGTERM → SIGKILL)"
+    echo "  stop -9 / --kill          Hard stop — SIGKILL immediately"
+    echo ""
+    echo "  restart                   stop + start"
+    echo "  restart -f / --force      stop + start -f"
+    echo ""
+    echo "  status                    Show PID and uptime"
+    echo "  status -v / --verbose     Status + last 10 log lines"
+    echo ""
+    echo "  logs                      Follow log (tail -f)"
+    echo "  logs -n N                 Last N lines, no follow"
+    echo ""
+    echo "  update                    git pull → pip install → restart"
+    echo "  update -f / --force       Continue even if git pull fails"
+    echo ""
+    echo "  module refresh            Scan Modules/ — add new files to registry"
+    echo "  module refresh_registry   Alias for 'module refresh'"
+    echo "  module refresh --dry-run  Preview additions without writing"
 }
 
 _ensure_runtime_dirs() {
     mkdir -p "${LOG_DIR}" "${TEMP_DIR}"
+}
+
+_ensure_ticket_env() {
+    [[ -f "${TICKET_ENV_FILE}" ]] && return 0
+    info "Creating Main/ticket.env with default settings..."
+    {
+        echo "# ── Ticket system configuration ────────────────────────────"
+        echo "# Uncomment and fill in values to override built-in defaults."
+        echo "# Restart the bot after making changes."
+        echo "#"
+        echo "# TICKET_LOG_CHANNEL_ID=   # Channel ID to post ticket event logs"
+        echo "# TICKET_MAX_PER_USER=3    # Max open tickets per user (0 = unlimited)"
+        echo "# TICKET_TRANSCRIPT_ENABLED=true  # Save transcript HTML on close"
+    } > "${TICKET_ENV_FILE}"
+    ok "Main/ticket.env created."
 }
 
 _is_pid_running() {
@@ -51,7 +89,7 @@ _read_pid() {
 _cleanup_stale_pid() {
     if [[ -f "${PID_FILE}" ]]; then
         local pid
-        pid="$(<"${PID_FILE}" || true)"
+        pid="$(<"${PID_FILE}")" || true
         if ! _is_pid_running "${pid}"; then
             rm -f "${PID_FILE}"
         fi
@@ -89,6 +127,13 @@ _check_token() {
     fi
 }
 
+_check_bot_entry() {
+    if [[ ! -f "${BOT_ENTRY}" ]]; then
+        err "Bot entry file not found at Main/Bot.py."
+        exit 1
+    fi
+}
+
 _check_syntax() {
     local output
     if ! output="$("${PYTHON_BIN}" -m py_compile "${BOT_ENTRY}" 2>&1)"; then
@@ -101,6 +146,7 @@ _check_syntax() {
 _check_prereqs() {
     _check_venv
     _check_token
+    _check_bot_entry
     _check_syntax
 }
 
@@ -164,16 +210,41 @@ _bot_uptime_pretty() {
     echo "${h}h ${m}m ${s}s"
 }
 
+# ── start ────────────────────────────────────────────────────────────────────
+# Flags:
+#   -f / --force   Ignore non-fatal errors: syntax warnings and immediate crash.
+#                  Still exits on missing venv or missing token.
 _start_bot() {
+    local force="false"
+    while [[ $# -gt 0 ]]; do
+        case "${1}" in
+            -f|--force) force="true" ;;
+        esac
+        shift
+    done
+
     _ensure_runtime_dirs
+    _ensure_ticket_env
     _cleanup_stale_pid
-    _check_prereqs
+
+    if [[ "${force}" == "true" ]]; then
+        _check_venv
+        _check_token
+        _check_bot_entry
+        local syntax_out
+        if ! syntax_out="$("${PYTHON_BIN}" -m py_compile "${BOT_ENTRY}" 2>&1)"; then
+            warn "Main/Bot.py has a syntax error — starting anyway (-f)."
+            warn "${syntax_out}"
+        fi
+    else
+        _check_prereqs
+    fi
 
     if [[ -f "${PID_FILE}" ]]; then
         local existing_pid
         existing_pid="$(_read_pid || true)"
         if _is_pid_running "${existing_pid}"; then
-            warn "Bot is already running (PID ${existing_pid}). Use ./bot.sh restart to reload it."
+            warn "Bot is already running (PID ${existing_pid}). Use c-cord restart to reload."
             return 0
         fi
         rm -f "${PID_FILE}"
@@ -181,15 +252,45 @@ _start_bot() {
 
     _rotate_log_if_needed
 
-    bash -c "source \"${VENV_ACTIVATE}\" && exec python \"${BOT_ENTRY}\"" >> "${LOG_FILE}" 2>&1 &
+    local ts
+    ts="$(date '+%Y-%m-%d %H:%M:%S')"
+    echo "──────────────────────────────────────────────────" >> "${LOG_FILE}"
+    echo "Bot started at ${ts}" >> "${LOG_FILE}"
+    echo "──────────────────────────────────────────────────" >> "${LOG_FILE}"
+
+    bash -c "cd \"${SCRIPT_DIR}\" && source \"${VENV_ACTIVATE}\" && exec python \"${BOT_ENTRY}\"" >> "${LOG_FILE}" 2>&1 &
     local pid=$!
     echo "${pid}" > "${PID_FILE}"
+
+    sleep 3
+    if ! _is_pid_running "${pid}"; then
+        rm -f "${PID_FILE}"
+        if [[ "${force}" == "true" ]]; then
+            warn "Coffeecord exited immediately — check Storage/Logs/bot.log"
+            tail -n 5 "${LOG_FILE}" >&2
+            return 0
+        fi
+        err "Coffeecord crashed immediately after starting. Last log lines:"
+        tail -n 5 "${LOG_FILE}" >&2
+        return 1
+    fi
 
     ok "Coffeecord started (PID ${pid})"
     ok "Logging to Storage/Logs/bot.log"
 }
 
+# ── stop ─────────────────────────────────────────────────────────────────────
+# Flags:
+#   -9 / --kill   SIGKILL immediately — skip graceful shutdown wait.
 _stop_bot() {
+    local kill_hard="false"
+    while [[ $# -gt 0 ]]; do
+        case "${1}" in
+            -9|--kill) kill_hard="true" ;;
+        esac
+        shift
+    done
+
     _ensure_runtime_dirs
     _cleanup_stale_pid
 
@@ -203,6 +304,13 @@ _stop_bot() {
     if ! _is_pid_running "${pid}"; then
         rm -f "${PID_FILE}"
         info "Bot is not running."
+        return 0
+    fi
+
+    if [[ "${kill_hard}" == "true" ]]; then
+        kill -9 "${pid}" 2>/dev/null || true
+        rm -f "${PID_FILE}"
+        ok "Coffeecord stopped (SIGKILL)."
         return 0
     fi
 
@@ -222,7 +330,18 @@ _stop_bot() {
     ok "Coffeecord stopped."
 }
 
+# ── status ───────────────────────────────────────────────────────────────────
+# Flags:
+#   -v / --verbose   Also print the last 10 lines of the log.
 _status_bot() {
+    local verbose="false"
+    while [[ $# -gt 0 ]]; do
+        case "${1}" in
+            -v|--verbose) verbose="true" ;;
+        esac
+        shift
+    done
+
     _ensure_runtime_dirs
     _cleanup_stale_pid
 
@@ -241,6 +360,11 @@ _status_bot() {
             echo "  PID     : ${pid}"
             echo "  Uptime  : ${uptime}"
             echo "  Log     : Storage/Logs/bot.log  (last line: ${last_line:-<empty>})"
+            if [[ "${verbose}" == "true" && -f "${LOG_FILE}" ]]; then
+                echo ""
+                echo "  ── Last 10 log lines ──────────────────────────────"
+                tail -n 10 "${LOG_FILE}" | sed 's/^/  /'
+            fi
             return 0
         fi
     fi
@@ -248,17 +372,21 @@ _status_bot() {
     echo -e "○ Coffeecord — stopped"
 }
 
+# ── logs ─────────────────────────────────────────────────────────────────────
+# Flags:
+#   -n N   Print last N lines then exit (no follow).
+#   (none) Follow log with tail -f.
 _logs_bot() {
     _ensure_runtime_dirs
     if [[ ! -f "${LOG_FILE}" ]]; then
-        info "No log file yet. Start the bot with ./bot.sh start"
+        info "No log file yet. Start the bot with c-cord start"
         return 0
     fi
 
     if [[ "${1:-}" == "-n" ]]; then
         local n="${2:-}"
         if [[ ! "${n}" =~ ^[0-9]+$ ]]; then
-            err "Usage: ./bot.sh logs -n <number>"
+            err "Usage: c-cord logs -n <number>"
             exit 1
         fi
         tail -n "${n}" "${LOG_FILE}"
@@ -268,7 +396,18 @@ _logs_bot() {
     tail -f "${LOG_FILE}"
 }
 
+# ── update ───────────────────────────────────────────────────────────────────
+# Flags:
+#   -f / --force   Continue even when git pull fails (network down, dirty tree, etc.)
 _update_bot() {
+    local force="false"
+    while [[ $# -gt 0 ]]; do
+        case "${1}" in
+            -f|--force) force="true" ;;
+        esac
+        shift
+    done
+
     _ensure_runtime_dirs
     _check_prereqs
 
@@ -283,8 +422,15 @@ _update_bot() {
     local pulled="skipped"
     if [[ -d "${SCRIPT_DIR}/.git" ]] && command -v git >/dev/null 2>&1; then
         info "Pulling latest changes..."
-        git -C "${SCRIPT_DIR}" pull
-        pulled="done"
+        if git -C "${SCRIPT_DIR}" pull; then
+            pulled="done"
+        elif [[ "${force}" == "true" ]]; then
+            warn "git pull failed — continuing anyway (-f)."
+            pulled="failed (ignored)"
+        else
+            err "git pull failed. Use c-cord update -f to continue anyway."
+            exit 1
+        fi
     else
         warn "Not a git repository or git unavailable; skipping git pull."
     fi
@@ -303,33 +449,96 @@ _update_bot() {
     echo "  - Bot state         : running"
 }
 
+# ── module refresh ────────────────────────────────────────────────────────────
+# Flags:
+#   --dry-run   Show what would be added without writing to modules.json.
+_module_refresh() {
+    local dry_run="false"
+    while [[ $# -gt 0 ]]; do
+        case "${1}" in
+            --dry-run) dry_run="true" ;;
+        esac
+        shift
+    done
+
+    _check_venv
+    _ensure_runtime_dirs
+
+    local result added total py_dry_arg=""
+    [[ "${dry_run}" == "true" ]] && py_dry_arg="dry_run=True" || py_dry_arg="dry_run=False"
+
+    if result="$(cd "${SCRIPT_DIR}" && "${PYTHON_BIN}" -c "
+from Modules.module_registry import refresh_registry
+a, t = refresh_registry(${py_dry_arg})
+print(a, t)
+" 2>&1)"; then
+        read -r added total <<< "${result}"
+        if [[ "${dry_run}" == "true" ]]; then
+            info "Dry run: ${added} new module(s) would be added (${total} total)."
+            if (( added > 0 )); then
+                info "Run without --dry-run to register them."
+            fi
+        else
+            ok "Module registry refreshed — added ${added} new module(s), ${total} total."
+            if (( added > 0 )); then
+                info "Run c-cord restart to load the new module(s)."
+            fi
+        fi
+    else
+        err "Module refresh failed:"
+        echo "${result}" >&2
+        exit 1
+    fi
+}
+
 main() {
     local cmd="${1:-}"
+    shift || true
+
     case "${cmd}" in
         start)
-            _start_bot
+            _start_bot "$@"
             ;;
         stop)
-            _stop_bot
+            _stop_bot "$@"
             ;;
         restart)
             _stop_bot
-            _start_bot
+            _start_bot "$@"
             ;;
         status)
-            _status_bot
+            _status_bot "$@"
             ;;
         logs)
-            shift || true
-            _logs_bot "${1:-}" "${2:-}"
+            _logs_bot "$@"
             ;;
         update)
-            _update_bot
+            _update_bot "$@"
+            ;;
+        module)
+            local subcmd="${1:-}"
+            shift || true
+            case "${subcmd}" in
+                refresh|refresh_registry)
+                    _module_refresh "$@"
+                    ;;
+                "")
+                    echo "Usage: c-cord module <refresh|refresh_registry> [--dry-run]"
+                    exit 1
+                    ;;
+                *)
+                    err "Unknown module subcommand: '${subcmd}'"
+                    echo "Available: refresh, refresh_registry"
+                    exit 1
+                    ;;
+            esac
             ;;
         ""|-h|--help|help)
             _usage
             ;;
         *)
+            err "Unknown command: '${cmd}'"
+            echo ""
             _usage
             exit 1
             ;;

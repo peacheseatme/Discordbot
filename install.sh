@@ -122,6 +122,16 @@ info "Installing packages from requirements.txt  (this may take a minute)..."
 pip install -r "$SCRIPT_DIR/requirements.txt" --quiet
 success "All dependencies installed."
 
+if ! python -c 'import pkg_resources' 2>/dev/null; then
+    warn "pkg_resources missing (setuptools too new). Installing compatible version..."
+    pip install 'setuptools>=69.0,<75' --quiet
+    if python -c 'import pkg_resources' 2>/dev/null; then
+        success "pkg_resources restored."
+    else
+        error "Could not restore pkg_resources. pet-pet-gif may fail at runtime."
+    fi
+fi
+
 # ──────────────────────────────────────────────────────────────
 # 4. Create missing Storage directories
 # ──────────────────────────────────────────────────────────────
@@ -316,12 +326,20 @@ echo -e "${BOLD}${GREEN}╚═════════════════�
 echo ""
 echo -e "  ${BOLD}Run the bot from anywhere:${RESET}"
 echo ""
-echo -e "    ${CYAN}c-cord start${RESET}       — Start the bot in the background"
-echo -e "    ${CYAN}c-cord stop${RESET}        — Stop the bot"
-echo -e "    ${CYAN}c-cord restart${RESET}     — Restart the bot"
-echo -e "    ${CYAN}c-cord status${RESET}      — Show status and uptime"
-echo -e "    ${CYAN}c-cord logs${RESET}        — Tail live log output"
-echo -e "    ${CYAN}c-cord update${RESET}      — Pull latest changes and restart"
+echo -e "    ${CYAN}c-cord start${RESET}                — Start bot in the background"
+echo -e "    ${CYAN}c-cord start -f${RESET}             — Start, ignore non-fatal errors"
+echo -e "    ${CYAN}c-cord stop${RESET}                 — Graceful stop"
+echo -e "    ${CYAN}c-cord stop -9${RESET}              — Hard stop (SIGKILL)"
+echo -e "    ${CYAN}c-cord restart${RESET}              — Stop then start"
+echo -e "    ${CYAN}c-cord status${RESET}               — PID and uptime"
+echo -e "    ${CYAN}c-cord status -v${RESET}            — Status + recent log lines"
+echo -e "    ${CYAN}c-cord logs${RESET}                 — Follow log live"
+echo -e "    ${CYAN}c-cord logs -n 50${RESET}           — Last 50 lines"
+echo -e "    ${CYAN}c-cord update${RESET}               — git pull → deps → restart"
+echo -e "    ${CYAN}c-cord update -f${RESET}            — Update, ignore git failures"
+echo -e "    ${CYAN}c-cord module refresh${RESET}       — Register new drop-in modules"
+echo -e "    ${CYAN}c-cord module refresh_registry${RESET} — Alias for module refresh"
+echo -e "    ${CYAN}c-cord module refresh --dry-run${RESET}  — Preview without writing"
 echo ""
 
 if [[ -n "$PATH_ADDED_TO" ]] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then

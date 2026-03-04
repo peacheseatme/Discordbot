@@ -1,12 +1,18 @@
+import ast
 import asyncio
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_DIR = BASE_DIR / "Storage" / "Config"
+MODULES_DIR = BASE_DIR / "Modules"
 REGISTRY_PATH = CONFIG_DIR / "modules.json"
 STATE_PATH = CONFIG_DIR / "module_states.json"
+
+# These files live in Modules/ but are not loadable cogs.
+_DISCOVERY_EXCLUDE: frozenset[str] = frozenset({"module_registry", "kofi_webhook"})
 
 _REGISTRY_LOCK = asyncio.Lock()
 _STATE_LOCK = asyncio.Lock()
@@ -291,6 +297,101 @@ async def is_module_enabled(guild_id: int, module_id: str) -> bool:
     module_id = str(module_id).strip().lower()
     states = await get_guild_module_states(guild_id)
     return bool(states.get(module_id, True))
+
+
+def _stem_to_display_name(stem: str) -> str:
+    """Convert snake_case filename stem to Title Case display name."""
+    return re.sub(r"_([a-z])", lambda m: " " + m.group(1).upper(), stem).title()
+
+
+def _extract_module_meta(file_path: Path) -> dict[str, str]:
+    """
+    Statically parse optional metadata variables from a module file:
+        __module_display_name__ = "My Module"
+        __module_description__  = "Does something useful."
+        __module_category__     = "utilities"
+    Returns only the keys that are present.
+    """
+    META_VARS = {"__module_display_name__", "__module_description__", "__module_category__"}
+    KEY_MAP = {
+        "__module_display_name__": "display_name",
+        "__module_description__": "description",
+        "__module_category__": "category",
+    }
+    meta: dict[str, str] = {}
+    try:
+        src = file_path.read_text(encoding="utf-8", errors="replace")
+        tree = ast.parse(src, filename=str(file_path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Assign):
+                continue
+            for target in node.targets:
+                if not isinstance(target, ast.Name) or target.id not in META_VARS:
+                    continue
+                if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                    meta[KEY_MAP[target.id]] = node.value.value
+    except (OSError, SyntaxError):
+        pass
+    return meta
+
+
+def discover_modules_on_disk() -> list[dict[str, Any]]:
+    """Scan Modules/ and return a registry entry for every loadable .py file found."""
+    discovered: list[dict[str, Any]] = []
+    if not MODULES_DIR.is_dir():
+        return discovered
+    for py_file in sorted(MODULES_DIR.glob("*.py")):
+        stem = py_file.stem
+        if stem in _DISCOVERY_EXCLUDE:
+            continue
+        meta = _extract_module_meta(py_file)
+        discovered.append(
+            {
+                "id": stem.lower(),
+                "extension": f"Modules.{stem}",
+                "path": f"Modules/{py_file.name}",
+                "display_name": meta.get("display_name") or _stem_to_display_name(stem),
+                "description": meta.get("description", ""),
+                "default_enabled": True,
+                "category": meta.get("category", "utilities"),
+            }
+        )
+    return discovered
+
+
+def refresh_registry(dry_run: bool = False) -> tuple[int, int]:
+    """
+    Merge newly discovered modules on disk into modules.json.
+
+    Existing entries are preserved unchanged (custom descriptions, categories, etc.).
+    Only new entries — files not already in the registry — are appended.
+
+    Returns:
+        (added_count, total_count)
+    """
+    existing_raw = _read_json_sync(REGISTRY_PATH, REGISTRY_DEFAULT)
+    existing_list: list[dict[str, Any]] = existing_raw.get("modules", [])
+    if not isinstance(existing_list, list):
+        existing_list = []
+
+    existing_map: dict[str, dict[str, Any]] = {
+        str(m.get("id", "")).strip().lower(): m
+        for m in existing_list
+        if isinstance(m, dict) and m.get("id")
+    }
+
+    added = 0
+    for mod in discover_modules_on_disk():
+        mid = mod["id"]
+        if mid not in existing_map:
+            existing_map[mid] = mod
+            added += 1
+
+    total = len(existing_map)
+    if not dry_run:
+        merged = [existing_map[k] for k in sorted(existing_map)]
+        _write_json_sync(REGISTRY_PATH, {"modules": merged})
+    return added, total
 
 
 async def set_module_enabled(guild_id: int, module_id: str, enabled: bool) -> None:
