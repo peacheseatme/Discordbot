@@ -9,10 +9,10 @@
     "leave": {
       "enabled": true,
       "channel_id": 1386804649839038484,
-      "message": "Were sorry to use you go {user_name.}",
+      "message": "We're sad to see you go {user_name}.",
       "embed_enabled": true,
       "exit_survey_enabled": true,
-      "exit_survey_log_channel_id": null
+      "exit_survey_log_channel_id": 1388577818752974970
     }
   },
   "1476341182182195351": {

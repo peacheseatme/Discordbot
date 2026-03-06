@@ -25,7 +25,7 @@ cd "$SCRIPT_DIR"
 
 # ── Bootstrap clone if installer is not running from a repo clone ──
 if ! git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
-   || [ ! -f "$SCRIPT_DIR/Main/Bot.py" ] \
+   || [ ! -f "$SCRIPT_DIR/Src/Bot.py" ] \
    || [ ! -f "$SCRIPT_DIR/bot.sh" ]; then
     if ! command -v git >/dev/null 2>&1; then
         error "git is required to clone the repository but was not found."
@@ -133,7 +133,7 @@ if ! python -c 'import pkg_resources' 2>/dev/null; then
 fi
 
 # ──────────────────────────────────────────────────────────────
-# 4. Create missing Storage directories
+# 4. Create Storage directories and generate placeholder config/data
 # ──────────────────────────────────────────────────────────────
 header "Step 4 — Verifying Storage directory structure"
 
@@ -144,13 +144,22 @@ for dir in \
     Storage/Backups \
     Storage/Assets \
     Storage/Temp/level_cache \
-    Storage/Data/ticket_transcripts
+    Storage/Data/ticket_transcripts \
+    Storage/Config/theme_storage \
+    Main
 do
     if [ ! -d "$SCRIPT_DIR/$dir" ]; then
         mkdir -p "$SCRIPT_DIR/$dir"
         success "Created  $dir/"
     fi
 done
+
+info "Generating Storage placeholder files (if missing)..."
+if [ -f "$SCRIPT_DIR/scripts/generate_storage_placeholders.py" ]; then
+    "$PYTHON_CMD" "$SCRIPT_DIR/scripts/generate_storage_placeholders.py" || true
+else
+    warn "scripts/generate_storage_placeholders.py not found; Storage files may need manual creation."
+fi
 success "Storage directories are ready."
 
 # ──────────────────────────────────────────────────────────────
@@ -158,7 +167,7 @@ success "Storage directories are ready."
 # ──────────────────────────────────────────────────────────────
 header "Step 5 — Bot configuration"
 
-ENV_FILE="$SCRIPT_DIR/Main/.env"
+ENV_FILE="$SCRIPT_DIR/Src/.env"
 
 # ── Helper: read a value, optionally with a default ──
 prompt_value() {
@@ -205,7 +214,7 @@ prompt_value() {
 EXISTING_TOKEN=""
 
 if [ -f "$ENV_FILE" ]; then
-    info "Found existing Main/.env — loading current token."
+    info "Found existing Src/.env — loading current token."
     while IFS='=' read -r KEY VALUE; do
         VALUE="${VALUE%\"}"
         VALUE="${VALUE#\"}"
@@ -229,7 +238,7 @@ while [ -z "$DISCORD_TOKEN" ]; do
 done
 
 # ── Write .env file — Ko-fi lines are commented out by default ──
-info "Writing Main/.env ..."
+info "Writing Src/.env ..."
 {
     echo "DISCORD_TOKEN=$DISCORD_TOKEN"
     echo ""
@@ -242,7 +251,7 @@ info "Writing Main/.env ..."
     echo "# KOFI_VERIFICATION_TOKEN=your_token_here"
     echo "# KOFI_PORT=5000"
 } > "$ENV_FILE"
-success "Main/.env written."
+success "Src/.env written."
 
 # ──────────────────────────────────────────────────────────────
 # 6. Install the c-cord CLI command
@@ -300,7 +309,7 @@ fi
 header "Step 7 — Syntax check"
 
 FILES_OK=true
-for pyfile in Main/Bot.py Modules/automod.py Modules/tickets.py Modules/leveling.py; do
+for pyfile in Src/Bot.py Modules/automod.py Modules/tickets.py Modules/leveling.py; do
     if [ -f "$SCRIPT_DIR/$pyfile" ]; then
         if python -m py_compile "$SCRIPT_DIR/$pyfile" 2>/dev/null; then
             success "$pyfile"
@@ -349,7 +358,7 @@ if [[ -n "$PATH_ADDED_TO" ]] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
 fi
 
 echo -e "  ${BOLD}Ko-fi integration (disabled by default):${RESET}"
-echo -e "    Open ${CYAN}Main/.env${RESET} and uncomment ${CYAN}KOFI_VERIFICATION_TOKEN${RESET}"
+echo -e "    Open ${CYAN}Src/.env${RESET} and uncomment ${CYAN}KOFI_VERIFICATION_TOKEN${RESET}"
 echo -e "    and ${CYAN}KOFI_PORT${RESET}, then run ${CYAN}c-cord restart${RESET}."
 echo ""
 echo -e "  ${BOLD}Invite the bot to your server:${RESET}"

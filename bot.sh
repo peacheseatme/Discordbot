@@ -15,9 +15,9 @@ VENV_ACTIVATE="${VENV_DIR}/bin/activate"
 PYTHON_BIN="${VENV_DIR}/bin/python"
 PIP_BIN="${VENV_DIR}/bin/pip"
 
-BOT_ENTRY="${SCRIPT_DIR}/Main/Bot.py"
-ENV_FILE="${SCRIPT_DIR}/Main/.env"
-TICKET_ENV_FILE="${SCRIPT_DIR}/Main/ticket.env"
+BOT_ENTRY="${SCRIPT_DIR}/Src/Bot.py"
+ENV_FILE="${SCRIPT_DIR}/Src/.env"
+TICKET_ENV_FILE="${SCRIPT_DIR}/Src/ticket.env"
 LOG_DIR="${SCRIPT_DIR}/Storage/Logs"
 TEMP_DIR="${SCRIPT_DIR}/Storage/Temp"
 PID_FILE="${TEMP_DIR}/bot.pid"
@@ -59,7 +59,7 @@ _ensure_runtime_dirs() {
 
 _ensure_ticket_env() {
     [[ -f "${TICKET_ENV_FILE}" ]] && return 0
-    info "Creating Main/ticket.env with default settings..."
+    info "Creating Src/ticket.env with default settings..."
     {
         echo "# ── Ticket system configuration ────────────────────────────"
         echo "# Uncomment and fill in values to override built-in defaults."
@@ -69,7 +69,7 @@ _ensure_ticket_env() {
         echo "# TICKET_MAX_PER_USER=3    # Max open tickets per user (0 = unlimited)"
         echo "# TICKET_TRANSCRIPT_ENABLED=true  # Save transcript HTML on close"
     } > "${TICKET_ENV_FILE}"
-    ok "Main/ticket.env created."
+    ok "Src/ticket.env created."
 }
 
 _is_pid_running() {
@@ -105,7 +105,7 @@ _check_venv() {
 
 _check_token() {
     if [[ ! -f "${ENV_FILE}" ]]; then
-        err "DISCORD_TOKEN is not set in Main/.env. Run ./install.sh to configure it."
+        err "DISCORD_TOKEN is not set in Src/.env. Run ./install.sh to configure it."
         exit 1
     fi
 
@@ -122,14 +122,14 @@ _check_token() {
     token="${token#"${token%%[![:space:]]*}"}"
     token="${token%"${token##*[![:space:]]}"}"
     if [[ -z "${token}" ]]; then
-        err "DISCORD_TOKEN is not set in Main/.env. Run ./install.sh to configure it."
+        err "DISCORD_TOKEN is not set in Src/.env. Run ./install.sh to configure it."
         exit 1
     fi
 }
 
 _check_bot_entry() {
     if [[ ! -f "${BOT_ENTRY}" ]]; then
-        err "Bot entry file not found at Main/Bot.py."
+        err "Bot entry file not found at Src/Bot.py."
         exit 1
     fi
 }
@@ -137,7 +137,7 @@ _check_bot_entry() {
 _check_syntax() {
     local output
     if ! output="$("${PYTHON_BIN}" -m py_compile "${BOT_ENTRY}" 2>&1)"; then
-        err "Main/Bot.py has a syntax error. Fix it before starting."
+        err "Src/Bot.py has a syntax error. Fix it before starting."
         echo "${output}" >&2
         exit 1
     fi
@@ -233,7 +233,7 @@ _start_bot() {
         _check_bot_entry
         local syntax_out
         if ! syntax_out="$("${PYTHON_BIN}" -m py_compile "${BOT_ENTRY}" 2>&1)"; then
-            warn "Main/Bot.py has a syntax error — starting anyway (-f)."
+            warn "Src/Bot.py has a syntax error — starting anyway (-f)."
             warn "${syntax_out}"
         fi
     else
@@ -258,7 +258,7 @@ _start_bot() {
     echo "Bot started at ${ts}" >> "${LOG_FILE}"
     echo "──────────────────────────────────────────────────" >> "${LOG_FILE}"
 
-    bash -c "cd \"${SCRIPT_DIR}\" && source \"${VENV_ACTIVATE}\" && exec python \"${BOT_ENTRY}\"" >> "${LOG_FILE}" 2>&1 &
+    bash -c "cd \"${SCRIPT_DIR}\" && source \"${VENV_ACTIVATE}\" && PYTHONUNBUFFERED=1 exec python \"${BOT_ENTRY}\"" >> "${LOG_FILE}" 2>&1 &
     local pid=$!
     echo "${pid}" > "${PID_FILE}"
 
@@ -409,7 +409,14 @@ _update_bot() {
     done
 
     _ensure_runtime_dirs
-    _check_prereqs
+    if [[ "${force}" == "true" ]]; then
+        # In force mode, keep hard-blocker checks but allow non-fatal startup checks to be ignored.
+        _check_venv
+        _check_token
+        _check_bot_entry
+    else
+        _check_prereqs
+    fi
 
     local was_running=false
     local current_pid
@@ -438,8 +445,12 @@ _update_bot() {
     info "Updating dependencies..."
     "${PIP_BIN}" install -r "${SCRIPT_DIR}/requirements.txt" --quiet
 
-    _check_syntax
-    _start_bot
+    if [[ "${force}" == "true" ]]; then
+        _start_bot -f
+    else
+        _check_syntax
+        _start_bot
+    fi
 
     echo ""
     ok "Update summary:"

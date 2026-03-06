@@ -221,32 +221,16 @@ async def _forward_exit_survey_to_channel(
     reason: str,
     survey_log_channel_id: Any,
 ) -> None:
-    # region agent log
-    import time as _t, json as _j, os as _os
-    _lp = "/home/gavin/Downloads/Coffeecord/.cursor/debug.log"
-    def _wl(msg, data):
-        try:
-            with open(_lp, "a") as _f:
-                _f.write(_j.dumps({"timestamp": int(_t.time()*1000), "location": "welcome_leave:forward", "message": msg, "data": data, "hypothesisId": "F"}) + "\n")
-        except Exception: pass
     guild = bot.get_guild(guild_id)
-    _wl("forward_entry", {"guild_found": guild is not None, "log_ch_id": survey_log_channel_id, "is_int": isinstance(survey_log_channel_id, int)})
-    # endregion
     if guild is None or not isinstance(survey_log_channel_id, int):
         return
     channel = guild.get_channel(survey_log_channel_id)
-    # region agent log
-    _wl("channel_lookup", {"channel_found": channel is not None, "channel_type": type(channel).__name__ if channel else "None"})
-    # endregion
     if not isinstance(channel, discord.TextChannel):
         return
     me = guild.me or (guild.get_member(bot.user.id) if bot.user else None)
     if me is None:
         return
     perms = channel.permissions_for(me)
-    # region agent log
-    _wl("perms_check", {"view": perms.view_channel, "send": perms.send_messages, "embed": perms.embed_links})
-    # endregion
     if not perms.view_channel or not perms.send_messages:
         return
     embed = discord.Embed(
@@ -270,17 +254,6 @@ async def _attempt_exit_survey(
     guild_id: int,
     survey_log_channel_id: Any = None,
 ) -> None:
-    # region agent log
-    import time as _t, json as _j, os as _os
-    _lp = "/home/gavin/Downloads/Coffeecord/.cursor/debug.log"
-    _os.makedirs(_os.path.dirname(_lp), exist_ok=True)
-    def _wl(msg, data, hid="A"):
-        try:
-            with open(_lp, "a") as _f:
-                _f.write(_j.dumps({"timestamp": int(_t.time()*1000), "location": "welcome_leave:survey", "message": msg, "data": data, "hypothesisId": hid}) + "\n")
-        except Exception: pass
-    _wl("survey_start", {"member_id": member.id, "guild_id": guild_id, "log_ch": survey_log_channel_id})
-    # endregion
     try:
         prompt = (
             f"Why did you leave **{guild_name}**?\n"
@@ -295,13 +268,7 @@ async def _attempt_exit_survey(
         )
         dm = await member.create_dm()
         await dm.send(prompt)
-        # region agent log
-        _wl("dm_sent_ok", {"dm_channel_id": dm.id})
-        # endregion
-    except discord.HTTPException as _e:
-        # region agent log
-        _wl("dm_send_failed", {"error": str(_e)}, "B")
-        # endregion
+    except discord.HTTPException:
         return
 
     def _check(msg: discord.Message) -> bool:
@@ -309,24 +276,12 @@ async def _attempt_exit_survey(
 
     try:
         reply = await bot.wait_for("message", timeout=300, check=_check)
-        # region agent log
-        _wl("reply_received", {"content": (reply.content or "")[:80], "channel_type": type(reply.channel).__name__}, "C")
-        # endregion
     except asyncio.TimeoutError:
-        # region agent log
-        _wl("wait_for_timeout", {}, "C")
-        # endregion
         return
-    except Exception as _e:
-        # region agent log
-        _wl("wait_for_error", {"error": str(_e)}, "C")
-        # endregion
+    except Exception:
         return
 
     reason = _normalize_survey_reason((reply.content or "").strip())
-    # region agent log
-    _wl("reason_normalized", {"raw": (reply.content or "").strip(), "normalized": reason}, "D")
-    # endregion
     if reason == "__custom__":
         try:
             await dm.send("Please type your custom reason in one message.")
@@ -339,9 +294,6 @@ async def _attempt_exit_survey(
     if not reason:
         return
     await _save_exit_survey(guild_id, member.id, reason)
-    # region agent log
-    _wl("saved_survey", {"reason": reason[:80]}, "E")
-    # endregion
     await _forward_exit_survey_to_channel(
         bot,
         guild_id=guild_id,

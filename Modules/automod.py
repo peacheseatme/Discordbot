@@ -22,6 +22,8 @@ else:
         "automod.py must be imported from the main bot script after bot and tree are defined"
     )
 
+from Modules import json_cache
+
 # Paths relative to Discordbot root (parent of Modules)
 _discordbot_root = Path(__file__).resolve().parent.parent
 CONFIG_PATH = _discordbot_root / "Storage" / "Config" / "automod.json"
@@ -223,22 +225,11 @@ class AutomodResult:
 
 
 def load_json(path: Path, default):
-    if not path.exists():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(default, f, indent=4)
-        return copy.deepcopy(default)
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        return copy.deepcopy(default)
+    return json_cache.get(path, copy.deepcopy(default) if default is not None else {})
 
 
 def save_json(path: Path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+    json_cache.set_(path, data)
 
 
 def merge_dicts(base: dict, override: dict) -> dict:
@@ -1159,6 +1150,7 @@ automod_group = app_commands.Group(name="automod", description="Automod manageme
 automod_set_group = app_commands.Group(name="set", description="Set automod values", parent=automod_group)
 automod_toggle_group = app_commands.Group(name="toggle", description="Toggle automod settings", parent=automod_group)
 automod_whitelist_group = app_commands.Group(name="whitelist", description="Manage automod whitelist", parent=automod_group)
+automod_exempt_group = app_commands.Group(name="exempt", description="Exempt roles from automod enforcement", parent=automod_group)
 automod_badword_group = app_commands.Group(name="badword", description="Manage blocked words", parent=automod_group)
 automod_channel_group = app_commands.Group(name="channel", description="Manage channel overrides", parent=automod_group)
 automod_warn_group = app_commands.Group(name="warn", description="Manage automod warns", parent=automod_group)
@@ -1247,6 +1239,48 @@ async def automod_set_log(interaction: discord.Interaction, channel: discord.Tex
         await interaction.response.send_message("Automod log channel cleared.", ephemeral=True)
 
 
+EXEMPT_ACTION_CHOICES = [
+    app_commands.Choice(name="Add", value="add"),
+    app_commands.Choice(name="Remove", value="remove"),
+]
+
+
+@automod_exempt_group.command(name="role", description="Add/remove role exemption from automod")
+@app_commands.choices(action=EXEMPT_ACTION_CHOICES)
+async def automod_exempt_role(
+    interaction: discord.Interaction,
+    action: app_commands.Choice[str],
+    role: discord.Role,
+):
+    if not interaction.guild_id or not await _require_admin(interaction):
+        return
+    override = update_guild_override(interaction.guild_id)
+    protected_roles = override.setdefault("protected_roles", [])
+    if action.value == "add":
+        if role.id not in protected_roles:
+            protected_roles.append(role.id)
+    else:
+        protected_roles[:] = [rid for rid in protected_roles if rid != role.id]
+    _save_config()
+    await interaction.response.send_message(
+        f"Exempt roles updated ({action.value}: {role.mention}).",
+        ephemeral=True,
+    )
+
+
+@automod_exempt_group.command(name="list", description="List roles exempt from automod")
+async def automod_exempt_list(interaction: discord.Interaction):
+    if not interaction.guild_id or not await _require_admin(interaction):
+        return
+    guild_cfg = get_guild_config(interaction.guild_id)
+    protected_roles = guild_cfg.get("protected_roles", [])
+    if not protected_roles:
+        await interaction.response.send_message("No exempt roles configured.", ephemeral=True)
+        return
+    mentions = " ".join(f"<@&{role_id}>" for role_id in protected_roles)
+    await interaction.response.send_message(f"Exempt roles: {mentions}", ephemeral=True)
+
+
 RULE_CHOICES = [
     app_commands.Choice(name="Bad Words", value="bad_words"),
     app_commands.Choice(name="Spam", value="spam"),
@@ -1262,6 +1296,155 @@ RULE_CHOICES = [
 ]
 
 ACTION_CHOICES = [app_commands.Choice(name=v.title(), value=v) for v in ACTION_NAMES]
+
+PRESET_LIGHT = "light"
+PRESET_MEDIUM = "medium"
+PRESET_STRICT = "strict"
+PRESET_DICTATORSHIP = "dictatorship"
+PRESET_LABELS = {
+    PRESET_LIGHT: "Light",
+    PRESET_MEDIUM: "Medium",
+    PRESET_STRICT: "Strict",
+    PRESET_DICTATORSHIP: "Dictatorship",
+}
+AUTOMOD_PRESET_CHOICES = [
+    app_commands.Choice(name=PRESET_LABELS[PRESET_LIGHT], value=PRESET_LIGHT),
+    app_commands.Choice(name=PRESET_LABELS[PRESET_MEDIUM], value=PRESET_MEDIUM),
+    app_commands.Choice(name=PRESET_LABELS[PRESET_STRICT], value=PRESET_STRICT),
+    app_commands.Choice(name=PRESET_LABELS[PRESET_DICTATORSHIP], value=PRESET_DICTATORSHIP),
+]
+AUTOMOD_PRESETS: dict[str, dict] = {
+    PRESET_LIGHT: {
+        "enabled": True,
+        "count_rule_violations_as_warns": False,
+        "bad_words": {"enabled": True, "action": "warn", "delete_message": True},
+        "spam": {"enabled": True, "max_messages": 8, "per_seconds": 6, "action": "warn", "timeout_seconds": 60},
+        "duplicate_messages": {"enabled": False},
+        "links": {"enabled": True, "block_invites": True, "block_links": False, "action": "warn"},
+        "mentions": {"enabled": True, "max_mentions": 8, "action": "warn"},
+        "caps": {"enabled": False, "caps_percent": 85},
+        "attachments": {"enabled": False},
+        "custom_regex": {"enabled": False},
+        "anti_selfbot": {"enabled": False},
+        "new_user": {"enabled": False},
+        "anti_raid": {"enabled": False},
+    },
+    PRESET_MEDIUM: {
+        "enabled": True,
+        "count_rule_violations_as_warns": False,
+        "bad_words": {"enabled": True, "action": "warn", "delete_message": True},
+        "spam": {"enabled": True, "max_messages": 6, "per_seconds": 5, "action": "timeout", "timeout_seconds": 120},
+        "duplicate_messages": {"enabled": True, "window_seconds": 30, "min_duplicates": 3, "action": "delete"},
+        "links": {"enabled": True, "block_invites": True, "block_links": True, "action": "delete"},
+        "mentions": {"enabled": True, "max_mentions": 5, "action": "warn"},
+        "caps": {"enabled": True, "min_length": 10, "caps_percent": 75, "action": "delete"},
+        "attachments": {"enabled": False},
+        "custom_regex": {"enabled": False},
+        "anti_selfbot": {"enabled": True, "action": "delete"},
+        "new_user": {"enabled": True, "max_account_age_days": 3, "action": "warn"},
+        "anti_raid": {"enabled": True, "window_seconds": 10, "join_threshold": 12, "cooldown_seconds": 60, "action": "timeout", "timeout_seconds": 300},
+    },
+    PRESET_STRICT: {
+        "enabled": True,
+        "count_rule_violations_as_warns": True,
+        "bad_words": {"enabled": True, "action": "timeout", "delete_message": True, "escalation": [{"count": 2, "action": "kick"}]},
+        "spam": {"enabled": True, "max_messages": 5, "per_seconds": 4, "action": "timeout", "timeout_seconds": 300},
+        "duplicate_messages": {"enabled": True, "window_seconds": 25, "min_duplicates": 3, "action": "timeout"},
+        "links": {"enabled": True, "block_invites": True, "block_links": True, "action": "delete"},
+        "mentions": {"enabled": True, "max_mentions": 4, "action": "timeout", "timeout_seconds": 180},
+        "caps": {"enabled": True, "min_length": 8, "caps_percent": 70, "action": "delete"},
+        "attachments": {"enabled": True, "max_attachments": 4, "max_embeds": 2, "action": "delete"},
+        "custom_regex": {"enabled": True},
+        "anti_selfbot": {"enabled": True, "action": "timeout", "timeout_seconds": 600},
+        "new_user": {"enabled": True, "max_account_age_days": 7, "action": "timeout", "timeout_seconds": 300},
+        "anti_raid": {"enabled": True, "window_seconds": 8, "join_threshold": 8, "cooldown_seconds": 120, "action": "timeout", "timeout_seconds": 900},
+    },
+    PRESET_DICTATORSHIP: {
+        "enabled": True,
+        "count_rule_violations_as_warns": True,
+        "bad_words": {"enabled": True, "action": "kick", "delete_message": True, "escalation": [{"count": 2, "action": "ban"}]},
+        "spam": {"enabled": True, "max_messages": 4, "per_seconds": 4, "action": "kick"},
+        "duplicate_messages": {"enabled": True, "window_seconds": 20, "min_duplicates": 2, "action": "kick"},
+        "links": {"enabled": True, "block_invites": True, "block_links": True, "action": "kick"},
+        "mentions": {"enabled": True, "max_mentions": 3, "action": "timeout", "timeout_seconds": 600},
+        "caps": {"enabled": True, "min_length": 6, "caps_percent": 65, "action": "timeout", "timeout_seconds": 300},
+        "attachments": {"enabled": True, "max_attachments": 2, "max_embeds": 1, "action": "delete"},
+        "custom_regex": {"enabled": True},
+        "anti_selfbot": {"enabled": True, "action": "ban"},
+        "new_user": {"enabled": True, "max_account_age_days": 30, "action": "timeout", "timeout_seconds": 1800},
+        "anti_raid": {"enabled": True, "window_seconds": 6, "join_threshold": 5, "cooldown_seconds": 300, "action": "ban"},
+    },
+}
+
+
+def _apply_automod_preset(guild_id: int, preset_key: str) -> None:
+    preset = AUTOMOD_PRESETS.get(preset_key)
+    if preset is None:
+        raise ValueError(f"Unknown preset: {preset_key}")
+    override = update_guild_override(guild_id)
+    for key, value in preset.items():
+        override[key] = copy.deepcopy(value)
+    _save_config()
+
+
+class AutomodPresetView(discord.ui.View):
+    def __init__(self, guild_id: int, invoker_id: int):
+        super().__init__(timeout=120)
+        self.guild_id = guild_id
+        self.invoker_id = invoker_id
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.invoker_id:
+            await interaction.response.send_message("Only the command invoker can use these preset buttons.", ephemeral=True)
+            return False
+        return True
+
+    async def _apply_and_confirm(self, interaction: discord.Interaction, preset_key: str) -> None:
+        _apply_automod_preset(self.guild_id, preset_key)
+        await interaction.response.edit_message(
+            content=f"✅ Applied automod preset: **{PRESET_LABELS[preset_key]}**",
+            view=self,
+        )
+
+    @discord.ui.button(label="Light", style=discord.ButtonStyle.secondary)
+    async def preset_light(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        await self._apply_and_confirm(interaction, PRESET_LIGHT)
+
+    @discord.ui.button(label="Medium", style=discord.ButtonStyle.primary)
+    async def preset_medium(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        await self._apply_and_confirm(interaction, PRESET_MEDIUM)
+
+    @discord.ui.button(label="Strict", style=discord.ButtonStyle.danger)
+    async def preset_strict(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        await self._apply_and_confirm(interaction, PRESET_STRICT)
+
+    @discord.ui.button(label="Dictatorship", style=discord.ButtonStyle.danger)
+    async def preset_dictatorship(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        await self._apply_and_confirm(interaction, PRESET_DICTATORSHIP)
+
+
+@automod_group.command(name="preset", description="Apply an automod preset directly or via buttons")
+@app_commands.choices(preset=AUTOMOD_PRESET_CHOICES)
+async def automod_preset(
+    interaction: discord.Interaction,
+    preset: app_commands.Choice[str] | None = None,
+):
+    if not interaction.guild_id or not await _require_admin(interaction):
+        return
+    if preset is not None:
+        _apply_automod_preset(interaction.guild_id, preset.value)
+        await interaction.response.send_message(
+            f"✅ Applied automod preset: **{PRESET_LABELS[preset.value]}**",
+            ephemeral=True,
+        )
+        return
+
+    view = AutomodPresetView(interaction.guild_id, interaction.user.id)
+    await interaction.response.send_message(
+        "Choose an automod preset:",
+        view=view,
+        ephemeral=True,
+    )
 
 RULE_SETTING_SPECS = {
     "spam": {

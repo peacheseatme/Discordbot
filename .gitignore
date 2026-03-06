@@ -5,6 +5,7 @@ venv/
 # Environment / secrets
 .env
 Main/.env
+Src/.env
 
 # Python cache
 __pycache__/
@@ -17,17 +18,11 @@ __pycache__/
 *.swp
 *.swo
 
-# Logs & temp runtime files
-Storage/Logs/
-Storage/Temp/
-*.log
-
-# Backups (large data files)
-Storage/Backups/
+# Storage (runtime data; install script generates placeholders)
+Storage/
 
 # Secret files
 *.env
-Storage/Data/ticket.env
 
 # Temporary media generated at runtime
 temp_*.mp4
@@ -39,5 +34,3 @@ temp_*.jpg
 
 # Old root-level data files (migrated to Storage/)
 *.json
-!Storage/Config/*.json
-!Storage/Data/*.json

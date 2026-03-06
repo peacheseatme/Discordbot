@@ -13,6 +13,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from .module_registry import is_module_enabled
+
 try:
     from google.cloud import translate_v2 as google_translate  # type: ignore
 except Exception:
@@ -38,26 +40,6 @@ FREE_LIMIT = 15
 WINDOW_SECONDS = 24 * 60 * 60
 MAX_TRANSLATE_LENGTH = 1500
 CACHE_TTL_SECONDS = 300
-DEBUG_LOG_PATH = BASE_DIR / ".cursor" / "debug.log"
-
-
-# region agent log
-def _dbg_log(run_id: str, hypothesis_id: str, location: str, message: str, data: dict) -> None:
-    try:
-        payload = {
-            "runId": run_id,
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000),
-        }
-        DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with DEBUG_LOG_PATH.open("a", encoding="utf-8") as fp:
-            fp.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except Exception:
-        pass
-# endregion
 
 
 def _load_json(path: Path, default: dict) -> dict:
@@ -431,6 +413,15 @@ class TranslateCog(
         translate_from: Optional[app_commands.Choice[str]] = None,
         show_only_to_me: bool = True,
     ) -> None:
+        if interaction.guild is None:
+            await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
+            return
+        if not await is_module_enabled(interaction.guild.id, "translate"):
+            await interaction.response.send_message(
+                "This module is currently disabled. An admin can enable it with /modules.",
+                ephemeral=True,
+            )
+            return
         # Map the Choice objects to plain ISO codes
         target_language = translate_to.value
         source_language = translate_from.value if translate_from is not None else "auto"
@@ -552,6 +543,12 @@ class TranslateCog(
         ephemeral: Optional[bool] = None,
         dm_delivery: Optional[bool] = None,
     ) -> None:
+        if interaction.guild is not None and not await is_module_enabled(interaction.guild.id, "translate"):
+            await interaction.response.send_message(
+                "This module is currently disabled. An admin can enable it with /modules.",
+                ephemeral=True,
+            )
+            return
         settings = self._get_user_settings(interaction.user.id)
         if preferred_language is not None:
             settings["language"] = preferred_language.value
@@ -589,6 +586,12 @@ class TranslateCog(
 
     @app_commands.command(name="usage", description="See your translation usage limits.")
     async def translate_usage(self, interaction: discord.Interaction) -> None:
+        if interaction.guild is not None and not await is_module_enabled(interaction.guild.id, "translate"):
+            await interaction.response.send_message(
+                "This module is currently disabled. An admin can enable it with /modules.",
+                ephemeral=True,
+            )
+            return
         if self._is_supporter(interaction.user.id):
             await interaction.response.send_message("Supporter: unlimited translations.", ephemeral=True)
             return
@@ -609,6 +612,15 @@ class TranslateCog(
     @app_commands.command(name="reset", description="Reset a user's translation usage (admin only).")
     @app_commands.checks.has_permissions(administrator=True)
     async def translate_reset_user(self, interaction: discord.Interaction, user: discord.User) -> None:
+        if interaction.guild is None:
+            await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
+            return
+        if not await is_module_enabled(interaction.guild.id, "translate"):
+            await interaction.response.send_message(
+                "This module is currently disabled. An admin can enable it with /modules.",
+                ephemeral=True,
+            )
+            return
         self.usage_data.pop(str(user.id), None)
         _save_json(USAGE_FILE, self.usage_data)
         await interaction.response.send_message(f"Reset translation usage for {user.mention}.", ephemeral=True)
@@ -639,6 +651,9 @@ class TranslateCog(
             return
 
         if message.guild is None:
+            return
+
+        if not await is_module_enabled(message.guild.id, "translate"):
             return
 
         target_users = await self._collect_relevant_users(message)
@@ -777,38 +792,3 @@ class TranslateCog(
 async def setup(bot: commands.Bot) -> None:
     cog = TranslateCog(bot)
     await bot.add_cog(cog)
-    # region agent log
-    try:
-        cmd = getattr(cog, "translate_command", None)
-        params = getattr(cmd, "_params", {}) if cmd is not None else {}
-        from_param = params.get("translate_from") if isinstance(params, dict) else None
-        to_param = params.get("translate_to") if isinstance(params, dict) else None
-        from_choices = list(getattr(from_param, "choices", []) or [])
-        to_choices = list(getattr(to_param, "choices", []) or [])
-        from_values = [str(getattr(choice, "value", "")) for choice in from_choices]
-        to_values = [str(getattr(choice, "value", "")) for choice in to_choices]
-        _dbg_log(
-            "translate_choices_probe_v1",
-            "H1_H2_H4",
-            "Modules/translate.py:setup",
-            "Translate command choice metadata captured",
-            {
-                "from_count": len(from_values),
-                "to_count": len(to_values),
-                "from_has_th": "th" in from_values,
-                "to_has_th": "th" in to_values,
-                "from_has_auto": "auto" in from_values,
-                "from_over_25": len(from_values) > 25,
-                "from_tail": from_values[-5:],
-                "to_tail": to_values[-5:],
-            },
-        )
-    except Exception as exc:
-        _dbg_log(
-            "translate_choices_probe_v1",
-            "H3",
-            "Modules/translate.py:setup",
-            "Failed to introspect translate command choices",
-            {"error": str(exc)},
-        )
-    # endregion

@@ -1,4 +1,3 @@
-from petpetgif import petpet
 import discord
 from discord.ext import commands
 import logging
@@ -7,6 +6,7 @@ import os
 import sys
 from dotenv import load_dotenv
 import asyncio
+import importlib
 from datetime import timedelta
 from discord.ext import commands
 from discord.ui import View, Button
@@ -19,34 +19,43 @@ from discord import app_commands
 from discord.ui import Select, View, Button
 import io
 from discord import File
-from PIL import Image, ImageDraw, ImageFont, ImageSequence
 from io import BytesIO
 import tempfile
 from discord import Interaction, SelectOption
-import yt_dlp
 import hashlib
 from datetime import datetime, timedelta
 import typing
 from discord import Member
 from typing import List
 import re
+from contextlib import asynccontextmanager
+
+import aiohttp
 
 load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
 # ───────── staff applications – storage helpers ─────────
-STAFF_APP_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Storage", "Data", "staff_applications.json")
+# Path setup (must be before Modules import)
+_bot_dir = os.path.dirname(os.path.abspath(__file__))
+_discordbot_root = os.path.dirname(_bot_dir)
+_modules_path = os.path.join(_discordbot_root, "Modules")
+_storage_dir = os.path.join(_discordbot_root, "Storage")
+if _discordbot_root not in sys.path:
+    sys.path.insert(0, _discordbot_root)
+if _modules_path not in sys.path:
+    sys.path.insert(0, _modules_path)
 
-def load_json(path: str, default: dict | list):
-    """Load JSON or return *default* if file missing / corrupt."""
-    try:
-        with open(path, "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return default
+from Modules import json_cache
 
-def save_json(path: str, data):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+def load_json(path: str, default: dict | list | None = None):
+    """Load JSON from cache or disk."""
+    return json_cache.get(path, default if default is not None else {})
+
+def save_json(path: str, data) -> None:
+    """Write JSON to disk and update cache."""
+    json_cache.set_(path, data)
+
+STAFF_APP_FILE = os.path.join(_storage_dir, "Data", "staff_applications.json")
 
 # In‑memory cache of the staff‑application config for *all* guilds
 staff_app_cfg: dict[str, dict] = load_json(STAFF_APP_FILE, {})
@@ -56,10 +65,11 @@ intents = discord.Intents.default()
 intents.guilds = True
 intents.message_content = True
 intents.members = True
-intents.presences = True
+ENABLE_PRESENCE_INTENT = os.getenv("ENABLE_PRESENCE_INTENT", "1").strip().lower() in {"1", "true", "yes", "on"}
+intents.presences = ENABLE_PRESENCE_INTENT
 OWNER_ID = 1168282467162136656
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix=".", intents=intents)
 
 tree = bot.tree
 
@@ -81,20 +91,45 @@ def _dispatch_module_log_event(
         pass
 
 
-# Load tickets module (must be after bot/tree are defined)
-import sys as _sys
-_bot_dir = os.path.dirname(os.path.abspath(__file__))
-_discordbot_root = os.path.dirname(_bot_dir)
-_modules_path = os.path.join(_discordbot_root, "Modules")
-_storage_dir = os.path.join(_discordbot_root, "Storage")
-if _discordbot_root not in _sys.path:
-    _sys.path.insert(0, _discordbot_root)
-if _modules_path not in _sys.path:
-    _sys.path.insert(0, _modules_path)
-import Modules.tickets as tickets
-import Modules.automod as automod
-from Modules import leveling as leveling_module
-from kofi_webhook import KoFiWebhookServer
+@asynccontextmanager
+async def _http_session():
+    """Yield shared aiohttp session, or a temporary one if on_ready has not run yet."""
+    session = getattr(bot, "http_session", None)
+    if session is not None and not session.closed:
+        yield session
+        return
+    session = aiohttp.ClientSession()
+    try:
+        yield session
+    finally:
+        await session.close()
+
+
+# Lazy-loaded modules
+_tickets_module: typing.Any | None = None
+_automod_module: typing.Any | None = None
+_leveling_module: typing.Any | None = None
+
+
+def _get_tickets_module() -> typing.Any:
+    global _tickets_module
+    if _tickets_module is None:
+        _tickets_module = importlib.import_module("Modules.tickets")
+    return _tickets_module
+
+
+def _get_automod_module() -> typing.Any:
+    global _automod_module
+    if _automod_module is None:
+        _automod_module = importlib.import_module("Modules.automod")
+    return _automod_module
+
+
+def _get_leveling_module() -> typing.Any:
+    global _leveling_module
+    if _leveling_module is None:
+        _leveling_module = importlib.import_module("Modules.leveling")
+    return _leveling_module
 
 GUILD_IDS = [
     1212210181044183171,  # Replace with your guild IDs
@@ -113,6 +148,11 @@ BOT_OWNER_ID = 1168282467162136656
 GALAXY_BOT_SERVER_ID = 1384771470860746753
 PERMANENT_INVITE = "https://discord.gg/wpHpe5fwuT"
 DONATION_URL = "https://ko-fi.com/coffeecord"
+GITHUB_URL = "https://github.com/peacheseatme/Discordbot"  # TODO: replace with real URL
+TOPGG_URL = "https://top.gg/bot/YOUR_BOT_ID"  # TODO: replace with real bot ID
+BOT_INVITE_URL = "https://discord.com/oauth2/authorize?client_id=1390501770437984377&permissions=8&scope=bot%20applications.commands"
+SUPPORT_SERVER = PERMANENT_INVITE
+BOT_VERSION = "1.0.0"  # TODO: keep updated
 SUPPORTERS_FILE = os.path.join(_storage_dir, "Data", "supporters.json")
 SUPPORTER_GRACE_DAYS = 35
 pending_kofi_links: dict[str, list[int]] = {}
@@ -290,46 +330,61 @@ class Theme:
 
 COMMAND_CATEGORIES = {
     "General": [
-        "/help", "/support-us", "/date", "/say", "/dm", "/poll"
+        "/help", "/support us", "/say", "/dm", "/poll", "/nickname"
     ],
-    "Yaps / Stats": [
-        "/yaps"
-    ],
-    "Tickets": [
-        "/ticket_setup", "/close"
+    "Ko-fi": [
+        "/kofi link", "/kofi status", "/kofi claim", "/kofi add", "/kofi remove"
     ],
     "Logging": [
-        "/logging_on", "/logging_off", "/logging_channel", "/logging_config"
+        "/logging status", "/logging setup", "/logging toggle", "/logging module", "/logging disable"
     ],
     "Moderation": [
         "/ban", "/unban", "/mute", "/unmute", "/hardmute",
-        "/muterole_create", "/muterole_update",
-        "/giverole", "/removerole", "/languagefilter"
+        "/muterole create", "/muterole update",
+        "/giverole", "/removerole", "/purge", "/specific_purge"
+    ],
+    "Automod": [
+        "/automod overview", "/automod on", "/automod off", "/automod status",
+        "/automod set log", "/automod toggle rule", "/automod badword add"
     ],
     "Fun": [
-        "/8ball", "/bet", "/flipcoin", "/marry", "/breakup", "/hug", "/kiss",
+        "/8ball", "/bet", "/flipcoin", "/hug", "/kiss",
         "/lovecalc", "/truth", "/dare", "/uwuify", "/nuke", "/roast",
         "/ak47", "/petpet", "/dog", "/cat", "/abracadaberamotherafu"
     ],
     "Timers / Reminders": [
         "/remindme", "/starttimer", "/checktimers", "/endtimer"
     ],
-    "Verification": [
-        "/verify", "/sendverifyreaction"
-    ],
     "Leveling": [
-        "/level", "/levelbackground", "/xpset", "/xp_config",
-        "/levelreward_add", "/levelreward_remove",
-        "/levelreward_list", "/levelreward_mode"
-    ],
-    "Autorole": [
-        "/autorole", "/setautorole"
-    ],
-    "Applications": [
-        "/application"
+        "/level", "/levelcard customize", "/levelcard preset", "/xpset", "/xp config",
+        "/levelreward add", "/levelreward remove",
+        "/levelreward list", "/levelreward mode"
     ],
     "Calls": [
-        "/call", "/call_add", "/call_remove", "/call_end", "/call_promote"
+        "/call create", "/call join", "/call add", "/call remove", "/call end", "/call promote"
+    ],
+    "Tickets": [
+        "/ticket setup", "/ticket add", "/ticket remove",
+        "/ticket_export", "/ticket_import"
+    ],
+    "Translation": [
+        "/translate text", "/translate settings", "/translate usage", "/translate reset"
+    ],
+    "Reaction Roles": [
+        "/reactionrole create", "/reactionrole list", "/reactionrole delete",
+        "/reactionrole config", "/reactionrole edit"
+    ],
+    "Welcome & Leave": [
+        "/welcome config", "/welcome test", "/leave config", "/leave test"
+    ],
+    "Setup Wizard": [
+        "/setup", "/setup_resume", "/setup_cancel"
+    ],
+    "Misc": [
+        "/verifyconfig", "/autorole status", "/autorole toggle", "/autorole add",
+        "/application", "/application setup", "/application toggle",
+        "/modules status", "/modules toggle", "/modules enable", "/modules disable",
+        "/adaptive_slowmode", "/uninstall", "/test"
     ],
     "Dev / Owner": [
         "/synccommands", "/debugcommands", "/clearchache",
@@ -387,6 +442,30 @@ async def help_cmd(interaction: discord.Interaction, search: str = None):
 
     view = HelpMenu(pages, 0)
     await interaction.response.send_message(embed=pages[0], view=view)
+
+
+@tree.command(name="about", description="Learn about Coffeecord")
+async def about_cmd(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="About Coffeecord",
+        color=discord.Color.from_str("#7B5EA7")
+    )
+    if interaction.client.user:
+        embed.set_thumbnail(url=interaction.client.user.display_avatar.url)
+    embed.add_field(name="Version", value=BOT_VERSION, inline=False)
+    embed.add_field(name="Developer", value=f"<@{BOT_OWNER_ID}>", inline=False)
+    embed.add_field(name="Servers", value=f"{len(interaction.client.guilds)} servers", inline=False)
+    embed.add_field(name="Ping", value=f"{round(interaction.client.latency * 1000)} ms", inline=False)
+    embed.set_footer(text="Coffeecord • Made with ☕")
+
+    view = discord.ui.View()
+    view.add_item(discord.ui.Button(label="GitHub", url=GITHUB_URL, emoji="🐙", style=discord.ButtonStyle.link, row=0))
+    view.add_item(discord.ui.Button(label="top.gg", url=TOPGG_URL, emoji="⬆️", style=discord.ButtonStyle.link, row=0))
+    view.add_item(discord.ui.Button(label="Invite Me", url=BOT_INVITE_URL, emoji="🤖", style=discord.ButtonStyle.link, row=1))
+    view.add_item(discord.ui.Button(label="Support Server", url=SUPPORT_SERVER, emoji="💬", style=discord.ButtonStyle.link, row=1))
+    view.add_item(discord.ui.Button(label="Ko-fi", url=DONATION_URL, emoji="☕", style=discord.ButtonStyle.link, row=1))
+
+    await interaction.response.send_message(embed=embed, view=view)
 
 class DonateView(discord.ui.View):
     def __init__(self):
@@ -757,6 +836,155 @@ async def kofi_remove(interaction: discord.Interaction, user: discord.Member):
 
 
 tree.add_command(kofi_group)
+
+
+# Ko-fi prefix commands (.kofi link/status/claim/add/remove)
+@bot.group(name="kofi", invoke_without_command=True)
+async def kofi_prefix(ctx: commands.Context):
+    if ctx.invoked_subcommand is None:
+        await ctx.send(
+            "Usage: `.kofi link <email>` | `.kofi status` | `.kofi claim <email>` | "
+            "`.kofi add <user> <email>` | `.kofi remove <user>` (add/remove: admin only)"
+        )
+
+
+@kofi_prefix.command(name="link")
+async def kofi_link_prefix(ctx: commands.Context, email: str):
+    if not _is_valid_email(email):
+        await ctx.send("❌ Please provide a valid email address.")
+        return
+    normalized = _normalize_email(email)
+    queue_position = _queue_pending_kofi_link(normalized, ctx.author.id)
+    claimed = _claim_unlinked_for_user(ctx.author.id, normalized)
+    if claimed:
+        await _notify_supporter_dm(
+            ctx.author.id,
+            f"Ko-fi link complete. {claimed} previous donation(s) were linked to your account.",
+        )
+        await ctx.send(f"✅ Linked. Claimed **{claimed}** existing Ko-fi payment(s) for `{normalized}`.")
+        _dispatch_module_log_event(
+            ctx.guild,
+            "supporters",
+            "kofi_link",
+            actor=ctx.author,
+            details=f"email={normalized}; claimed={claimed}",
+            channel_id=ctx.channel.id if ctx.channel else None,
+        )
+        return
+    await ctx.send(
+        f"✅ Pending — your next Ko-fi donation/subscription from `{normalized}` "
+        f"will link automatically. Queue position: **#{queue_position}**."
+    )
+    _dispatch_module_log_event(
+        ctx.guild,
+        "supporters",
+        "kofi_link_pending",
+        actor=ctx.author,
+        details=f"email={normalized}",
+        channel_id=ctx.channel.id if ctx.channel else None,
+    )
+
+
+@kofi_prefix.command(name="status")
+async def kofi_status_prefix(ctx: commands.Context):
+    data = load_supporters_db()
+    record = data.get("supporters", {}).get(str(ctx.author.id))
+    if not record:
+        await ctx.send("You are not marked as a supporter yet.")
+        return
+    active = _record_is_active(record)
+    if record.get("active") != active:
+        record["active"] = active
+        save_supporters_db(data)
+    embed = discord.Embed(title="Ko-fi Supporter Status", color=discord.Color.blurple())
+    embed.add_field(name="Active", value="Yes" if active else "No", inline=True)
+    embed.add_field(name="Tier", value=str(record.get("tier", "unknown")).title(), inline=True)
+    embed.add_field(name="Last Payment", value=str(record.get("last_payment", "Unknown")), inline=False)
+    embed.add_field(name="Total USD", value=f"{float(record.get('total_usd', 0.0) or 0.0):.2f}", inline=True)
+    await ctx.send(embed=embed)
+
+
+@kofi_prefix.command(name="claim")
+async def kofi_claim_prefix(ctx: commands.Context, email: str):
+    if not _is_valid_email(email):
+        await ctx.send("❌ Please provide a valid email address.")
+        return
+    normalized = _normalize_email(email)
+    claimed = _claim_unlinked_for_user(ctx.author.id, normalized)
+    if claimed:
+        await ctx.send(f"✅ Claimed **{claimed}** unlinked payment(s) for `{normalized}`.")
+        _dispatch_module_log_event(
+            ctx.guild,
+            "supporters",
+            "kofi_claim",
+            actor=ctx.author,
+            details=f"email={normalized}; claimed={claimed}",
+            channel_id=ctx.channel.id if ctx.channel else None,
+        )
+        return
+    queue_position = _queue_pending_kofi_link(normalized, ctx.author.id)
+    await ctx.send(
+        f"ℹ️ No unlinked payments found yet for `{normalized}`. "
+        f"A pending link was created at queue position **#{queue_position}**."
+    )
+    _dispatch_module_log_event(
+        ctx.guild,
+        "supporters",
+        "kofi_claim_pending",
+        actor=ctx.author,
+        details=f"email={normalized}",
+        channel_id=ctx.channel.id if ctx.channel else None,
+    )
+
+
+@kofi_prefix.command(name="add")
+@commands.has_permissions(administrator=True)
+async def kofi_add_prefix(ctx: commands.Context, user: discord.Member, email: str):
+    if not _is_valid_email(email):
+        await ctx.send("❌ Please provide a valid email address.")
+        return
+    data = load_supporters_db()
+    now = _safe_iso_now()
+    _upsert_supporter_payment(
+        data,
+        user.id,
+        email=_normalize_email(email),
+        tier="donation",
+        amount_usd=0.0,
+        transaction_id=None,
+        payment_ts=now,
+    )
+    save_supporters_db(data)
+    await ctx.send(f"✅ {user.mention} marked as an active supporter.")
+    _dispatch_module_log_event(
+        ctx.guild,
+        "supporters",
+        "supporter_add",
+        actor=ctx.author,
+        details=f"target_user_id={user.id}; email={_normalize_email(email)}",
+        channel_id=ctx.channel.id if ctx.channel else None,
+    )
+
+
+@kofi_prefix.command(name="remove")
+@commands.has_permissions(administrator=True)
+async def kofi_remove_prefix(ctx: commands.Context, user: discord.Member):
+    data = load_supporters_db()
+    record = data.get("supporters", {}).get(str(user.id))
+    if not record:
+        await ctx.send("❌ No supporter record exists for that user.")
+        return
+    record["active"] = False
+    save_supporters_db(data)
+    await ctx.send(f"✅ Supporter status disabled for {user.mention}.")
+    _dispatch_module_log_event(
+        ctx.guild,
+        "supporters",
+        "supporter_remove",
+        actor=ctx.author,
+        details=f"target_user_id={user.id}",
+        channel_id=ctx.channel.id if ctx.channel else None,
+    )
 
 
 from discord import app_commands, ui, Interaction
@@ -1501,17 +1729,18 @@ muterole_group = app_commands.Group(name="muterole", description="Mute role mana
 @muterole_group.command(name="create", description="Create and set a mute role")
 @app_commands.checks.has_permissions(manage_roles=True)
 async def muterole_create(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
     guild = interaction.guild
     role = await guild.create_role(name="Muted", reason="Mute role creation")
     for channel in guild.channels:
         try:
             await channel.set_permissions(role, send_messages=False, speak=False, add_reactions=False)
-        except:
+        except Exception:
             continue
 
     mute_config[str(guild.id)] = role.id
     save_mute_config(mute_config)
-    await interaction.response.send_message(f"✅ Created and set mute role: `{role.name}`", ephemeral=True)
+    await interaction.followup.send(f"✅ Created and set mute role: `{role.name}`", ephemeral=True)
     _dispatch_module_log_event(
         interaction.guild,
         "moderation",
@@ -1579,7 +1808,7 @@ async def hardmute(interaction: discord.Interaction, member: discord.Member, rea
 # Event Handlers
 @bot.event
 async def on_member_join(member):
-    await automod.process_member_join(member)
+    await _get_automod_module().process_member_join(member)
 
 @bot.event
 async def on_thread_join(thread, member):
@@ -1595,77 +1824,8 @@ async def on_member_update(before, after):
 
 autoroles = set()  # Store roles IDs for auto-assigning
 
-@tree.command(name="8ball", description="Ask the magic 8-ball a question.")
-@app_commands.describe(question="Your yes/no style question")
-async def eight_ball(interaction: discord.Interaction, question: str):
-    responses = [
-        "It is certain.",
-        "Without a doubt.",
-        "You may rely on it.",
-        "Yes, definitely.",
-        "It is decidedly so.",
-        "As I see it, yes.",
-        "Most likely.",
-        "Outlook good.",
-        "Yes.",
-        "Signs point to yes.",
-        "Reply hazy, try again.",
-        "Ask again later.",
-        "Better not tell you now.",
-        "Cannot predict now.",
-        "Concentrate and ask again.",
-        "Don't count on it.",
-        "My reply is no.",
-        "My sources say no.",
-        "Outlook not so good.",
-        "Very doubtful."
-    ]
-    answer = random.choice(responses)
-    await interaction.response.send_message(f"🎱 **Question:** {question}\n**Answer:** {answer}")
-
 marriages = {}  # user_id -> partner_id
 marriage_requests = {}  # user_id -> requester_id (pending requests)
-
-@tree.command(name="bet", description="Place a bet with another user.")
-@app_commands.describe(member="User to bet with", bet="What you want to bet")
-async def bet(interaction: discord.Interaction, member: discord.Member, bet: str):
-    await interaction.response.send_message(f"{interaction.user.mention} has bet {member.mention} {bet}!")
-
-@tree.command(name="flipcoin", description="Flip a coin, optionally with a prize.")
-@app_commands.describe(prize="Prize to win")
-async def flipcoin(interaction: discord.Interaction, prize: str = None):
-    result = random.choice(["Heads", "Tails"])
-    if prize:
-        await interaction.response.send_message(f"🪙 The coin landed on **{result}**! {interaction.user.mention} wins {prize}!")
-    else:
-        await interaction.response.send_message(f"🪙 The coin landed on **{result}**!")
-
-@tree.command(name="hug", description="Give someone a hug.")
-@app_commands.describe(member="User to hug")
-async def hug(interaction: discord.Interaction, member: discord.Member):
-    await interaction.response.send_message(f"🤗 {interaction.user.mention} gives {member.mention} a big hug!")
-
-@tree.command(name="kiss", description="Kiss someone.")
-@app_commands.describe(member="User to kiss")
-async def kiss(interaction: discord.Interaction, member: discord.Member):
-    await interaction.response.send_message(f"{interaction.user.mention} kissed {member.mention}!")
-
-@tree.command(name="lovecalc", description="Calculate love compatibility between two users.")
-@app_commands.describe(member1="First user", member2="Second user")
-async def lovecalc(interaction: discord.Interaction, member1: discord.Member, member2: discord.Member):
-    score = random.randint(0, 100)
-    hearts = "❤️" * (score // 10)
-    await interaction.response.send_message(f"💖 Love compatibility between {member1.mention} and {member2.mention} is {score}% {hearts}")
-
-@tree.command(name="truth", description="Ask someone a truth question.")
-@app_commands.describe(member="User to ask", question="Truth question")
-async def truth(interaction: discord.Interaction, member: discord.Member, question: str):
-    await interaction.response.send_message(f"🧠 {member.mention}, **Truth:** {question}")
-
-@tree.command(name="dare", description="Give someone a dare challenge.")
-@app_commands.describe(member="User to dare", challenge="Dare challenge")
-async def dare(interaction: discord.Interaction, member: discord.Member, challenge: str):
-    await interaction.response.send_message(f"🔥 {member.mention}, **Dare:** {challenge}")
 
 reminders = []
 timers = {}  # timer_id -> {user, end}
@@ -2168,7 +2328,8 @@ class VerifyStartView(discord.ui.View):
     @discord.ui.button(label="Verify Me ☕", style=discord.ButtonStyle.success, custom_id="verify_start_button")
     async def verify_me(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_verify_config()
-        config = data.get(self.guild_id)
+        guild_id_key = str(interaction.guild.id) if interaction.guild else self.guild_id
+        config = data.get(guild_id_key)
         if not config:
             return await interaction.response.send_message("⚙️ Verification not set up.", ephemeral=True)
 
@@ -2292,28 +2453,10 @@ async def setup(bot):
 
 # leveling system extracted to Modules/leveling.py
 
-@tree.command(name="abracadaberamotherafu", description="💥 Casts a mighty spell of a BIG TANK gun from Toefingers tank on a tank!")
-async def abracadaberamotherafu(interaction: discord.Interaction):
-    gif_url = "https://i.imgur.com/gXB0LAh.gif"  # Epic tank explosion GIF
-    message = f"🪄 **ABRACADABERA MOTHERAFU—**\n{interaction.user.mention} just nuked a tank into the next dimension! 💥🚓🔥"
-
     await interaction.response.send_message(message)
     await interaction.followup.send(gif_url)
 
 MODQUESTIONS_FILE = os.path.join(_storage_dir, "Config", "modquestions.json")
-
-def load_json(path, default=None):
-    if not os.path.exists(path):
-        return default if default is not None else {}
-    try:
-        with open(path, "r") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        return default if default is not None else {}
-
-def save_json(path, data):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
 
 mod_questions = load_json(MODQUESTIONS_FILE, {})      # guild‑scoped dict
 
@@ -2450,16 +2593,6 @@ def get_staff_cfg(guild_id: str) -> dict:
         "reviewer_role_id": None
     })
 
-def load_json(filename, default=None):
-    if os.path.exists(filename):
-        with open(filename, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return default or {}
-
-def save_json(filename, data):
-    with open(filename, "w") as f:
-        json.dump(data, f, indent=2)
-
 staff_app_cfg = load_json(STAFF_APP_FILE)
 
 # ─────────────────────────  /application  ──────────────────────────
@@ -2568,17 +2701,6 @@ async def application(interaction: discord.Interaction):
 
     # (Optional) store a copy in staff_app_cfg[guild_id]["applications"] …
 
-def load_json(filename, default=None):
-    if os.path.exists(filename):
-        with open(filename, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return default or {}
-
-def save_json(filename, data):
-    with open(filename, "w") as f:
-        json.dump(data, f, indent=2)
-
-     
 import aiohttp
 
 LEAVE_MSG = (
@@ -2687,88 +2809,7 @@ async def on_guild_channel_update(before: discord.abc.GuildChannel,
         await guild.leave()
         print(f"[NSFW‑LEAVE] Left guild {guild.name} ({guild.id}) "
               f"because channel #{after.name} was set to NSFW")
-
-@tree.command(name="dog", description="Get a picture of a dog (optionally by breed)")
-@app_commands.describe(breed="Optional dog breed (e.g., pug, husky)")
-async def dog(interaction: discord.Interaction, breed: str = None):
-    await interaction.response.defer()
-    url = "https://dog.ceo/api/breeds/image/random"
-    if breed:
-        url = f"https://dog.ceo/api/breed/{breed.lower()}/images/random"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            data = await resp.json()
-            if data["status"] == "success":
-                await interaction.followup.send(data["message"])
-            else:
-                await interaction.followup.send("❌ Breed not found or error getting dog image.")
-
-@tree.command(name="cat", description="Get a picture of a random cat")
-async def cat(interaction: discord.Interaction):
-    await interaction.response.defer()
-    url = "https://api.thecatapi.com/v1/images/search"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            data = await resp.json()
-            if data:
-                await interaction.followup.send(data[0]["url"])
-            else:
-                await interaction.followup.send("❌ Could not get a cat image.")
-
-from petpetgif import petpet
-
-@tree.command(name="petpet", description="Generate a petpet GIF of a user's avatar")
-@app_commands.describe(member="User to petpet")
-async def petpet_cmd(interaction: discord.Interaction, member: discord.Member = None):
-    member = member or interaction.user
-    avatar_url = member.display_avatar.replace(size=256).url
-    await interaction.response.defer()
-
-    async with aiohttp.ClientSession() as s:
-        async with s.get(avatar_url) as r:
-            img_bytes = await r.read()
-
-    buf_in = io.BytesIO(img_bytes)
-    buf_out = io.BytesIO()
-    petpet.make(buf_in, buf_out)  # from petpetgif :contentReference[oaicite:2]{index=2}
-    buf_out.seek(0)
-
-    await interaction.followup.send(file=File(buf_out, filename="petpet.gif"))
-
-@tree.command(name="ak47", description="Send a random AK-47 gif")
-async def ak47(interaction: discord.Interaction):
-    await interaction.response.send_message("https://giphy.com/gifs/cat-gun-thug-GaqnjVbSLs2uA")
-
-from uwuify import uwu
-@tree.command(name="uwuify", description="Convert text to uwu-style")
-@app_commands.describe(text="Text to uwuify")
-async def uwuify_cmd(interaction: discord.Interaction, text: str):
-    uwu_text = uwu(text)  # simple transformation :contentReference[oaicite:5]{index=5}
-    await interaction.response.send_message(f"・: {uwu_text}")
-
-@tree.command(name="nuke", description="Send a gift... surprise! 🎁")
-@app_commands.describe(member="The target of your gift")
-async def nuke(interaction: discord.Interaction, member: discord.Member):
-    url = "https://giphy.com/gifs/explosion-bomb-mushroom-X92pmIty2ZJp6"
-    await interaction.response.send_message(f"{interaction.user.mention} gave a 🎁 to {member.mention}!\n{url}")
-
-@tree.command(name="roast", description="Send a random roast")
-async def roast(interaction: discord.Interaction):
-    roasts = [
-        "You're as bright as a black hole, and twice as dense.",
-        "You have something on your chin… no, the third one down.",
-        "You're the reason the gene pool needs a lifeguard.",
-        "You bring everyone so much joy… when you leave the room.",
-        "You have the perfect face for radio.",
-        "You're like a cloud. When you disappear, it's a beautiful day.",
-        "You're not stupid; you just have bad luck thinking.",
-        "You have something on your face... oh wait, it's just your face.",
-        "You're the human version of a participation trophy.",
-        "You're so slow, it takes you an hour to cook minute rice.",
         "You’re not lazy, you’re just in energy-saving mode... permanently."
-    ]
-    await interaction.response.send_message(random.choice(roasts))
-
 # leveling reward and level-up logic extracted to Modules/leveling.py
 
 from discord.ui import Modal, TextInput, View, Select
@@ -2872,7 +2913,7 @@ async def on_message(message: discord.Message):
         return
 
     # Automod (runs first; if action taken, skip XP etc.)
-    if await automod.process_automod(message):
+    if await _get_automod_module().process_automod(message):
         return
 
     now = time.time()
@@ -2921,7 +2962,7 @@ async def on_message(message: discord.Message):
     # ==================================================
     # XP SYSTEM (extracted)
     # ==================================================
-    await leveling_module.award_message_xp(bot, message)
+    await _get_leveling_module().award_message_xp(bot, message)
 
     # ==================================================
     # TICKET LOGGING
@@ -2945,7 +2986,7 @@ async def on_message(message: discord.Message):
 # ------------------- REACTION XP -------------------
 @bot.event
 async def on_reaction_add(reaction, user):
-    await leveling_module.award_reaction_xp(bot, reaction, user)
+    await _get_leveling_module().award_reaction_xp(bot, reaction, user)
 
 
 # ------------------- VOICE XP -------------------
@@ -2959,7 +3000,7 @@ async def on_voice_state_update(member, before, after):
     if before.channel is None and after.channel is not None:
         active_vc_members.setdefault(guild_id, {})[user_id] = asyncio.get_event_loop().time()
     elif before.channel is not None and after.channel is None:
-        await leveling_module.award_voice_xp(bot, member, active_vc_members)
+        await _get_leveling_module().award_voice_xp(bot, member, active_vc_members)
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -3034,17 +3075,36 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
     print(f"[APP_COMMAND_ERROR] /{interaction.command.qualified_name if interaction.command else 'unknown'}")
     traceback.print_exception(type(original), original, original.__traceback__)
 
-@tree.command(name="synccommands", description="Force sync all commands (Owner only)")
-@app_commands.checks.has_permissions(manage_guild=True)
-async def sync_commands(interaction: discord.Interaction):
-    if interaction.user.id != 1168282467162136656:
-        await interaction.response.send_message("❌ Only the owner can run this.", ephemeral=True)
+
+# Owner-only prefix commands (non-owner: no response)
+@bot.command(name="synccommands")
+async def sync_commands_prefix(ctx: commands.Context):
+    if ctx.author.id != BOT_OWNER_ID:
         return
     try:
         synced = await tree.sync()
-        await interaction.response.send_message(f"✅ Synced {len(synced)} commands!", ephemeral=True)
+        await ctx.send(f"✅ Synced {len(synced)} commands!")
     except Exception as e:
-        await interaction.response.send_message(f"❌ Failed to sync: {e}", ephemeral=True)
+        await ctx.send(f"❌ Failed to sync: {e}")
+
+
+@bot.command(name="clearchache")
+async def clearchache_prefix(ctx: commands.Context):
+    if ctx.author.id != BOT_OWNER_ID:
+        return
+    msg = None
+    try:
+        msg = await ctx.send("🧹 Clearing and syncing commands, please wait...")
+        tree.clear_commands(guild=None)
+        await tree.sync()
+        await msg.edit(content="✅ Global commands cleared and resynced successfully!")
+    except Exception as e:
+        if msg is not None:
+            await msg.edit(content=f"❌ Error: {e}")
+        else:
+            await ctx.send(f"❌ Error: {e}")
+        print(f"[Sync Error] {e}")
+
 
 @tree.command(name="debugcommands", description="Print all registered commands")
 @app_commands.checks.has_permissions(manage_guild=True)
@@ -3052,25 +3112,6 @@ async def debug_commands(interaction: discord.Interaction):
     cmds = tree.get_commands()
     output = "\n".join(f"/{cmd.name}" for cmd in cmds)
     await interaction.response.send_message(f"Registered commands:\n```\n{output}\n```", ephemeral=True)
-
-@tree.command(name="clearchache", description="Owner-only: Clears and resyncs all slash commands")
-@app_commands.checks.has_permissions(manage_guild=True)
-async def clearchache(interaction: discord.Interaction):
-    if interaction.user.id != BOT_OWNER_ID:
-        await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
-        return
-
-    try:
-        await interaction.response.send_message("🧹 Clearing and syncing commands, please wait...", ephemeral=True)
-
-        tree.clear_commands(guild=None)  # Clear global commands
-        await tree.sync()  # Sync global commands again using your original tree
-
-        await interaction.followup.send("✅ Global commands cleared and resynced successfully!", ephemeral=True)
-
-    except Exception as e:
-        await interaction.followup.send(f"❌ Error: {e}", ephemeral=True)
-        print(f"[Sync Error] {e}")
 
 # ---------------------------
 # Helper to load/save calls
@@ -3467,10 +3508,6 @@ os.makedirs(_BACKUPS_DIR, exist_ok=True)
 # ==========================
 # BASIC UTILITIES
 # ==========================
-def save_json(path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
-
 def read_json(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -3973,7 +4010,18 @@ async def on_ready():
         print(f"🤖 Logged in as {bot.user}")
         bot.add_view(VerifyStartView("placeholder"))
 
-        tickets.register_persistent_views(bot)
+        # Shared aiohttp session for HTTP requests (dog, cat, level cards, etc.)
+        # Close existing session first (on_ready can fire on reconnects)
+        existing = getattr(bot, "http_session", None)
+        if existing is not None and not existing.closed:
+            await existing.close()
+        bot.http_session = aiohttp.ClientSession()
+
+        _get_tickets_module().register_persistent_views(bot)
+
+        # Preload automod and leveling to remove first-use delay
+        _get_automod_module()
+        _get_leveling_module()
 
         synced = await tree.sync()
         print("Synced:", len(synced))
@@ -3988,8 +4036,8 @@ import hashlib
 import time
 import base64
 
-# Use tickets module's TICKETS_FILE for export/import
-TICKETS_FILE = tickets.TICKETS_FILE
+# Keep ticket storage path local to avoid importing ticket module at startup.
+TICKETS_FILE = os.path.join(_storage_dir, "Data", "tickets.json")
 
 # 🔐 CHANGE THIS AND KEEP IT SECRET
 TICKET_SECRET = b"pM!v2czFkjfdOX@FzUWjA0k1$Ze&xlWZ*e4"
@@ -4166,7 +4214,7 @@ async def ticket_import(interaction: discord.Interaction, file: discord.Attachme
     # ---- Reattach control panel ----
     await channel.send(
         "🎛️ **Ticket Controls (Restored)**",
-        view=tickets.TicketControlPanel(guild_id, channel.id)
+        view=_get_tickets_module().TicketControlPanel(guild_id, channel.id)
     )
 
     await interaction.response.send_message(
@@ -4183,6 +4231,7 @@ async def _run_bot_with_kofi():
     kofi_server = None
     kofi_token = os.getenv("KOFI_VERIFICATION_TOKEN", "").strip()
     kofi_port = int(os.getenv("KOFI_PORT", "5000"))
+    from kofi_webhook import KoFiWebhookServer
     from Modules.module_registry import load_module_registry, validate_registry_paths
 
     registry_errors = await validate_registry_paths()
@@ -4196,19 +4245,21 @@ async def _run_bot_with_kofi():
     if registry_errors:
         print(
             f"[module-registry] {len(registry_errors)} module file(s) are not present yet; "
-            "those modules will be skipped during startup."
+            "those modules will be skipped during startup.",
+            flush=True,
         )
 
     # This command module must always remain available.
     try:
         await bot.load_extension("Modules.modules_cmd")
-        print("Loaded extension: Modules.modules_cmd")
+        print("Loaded extension: Modules.modules_cmd", flush=True)
     except commands.ExtensionAlreadyLoaded:
         pass
     except Exception as e:
-        print(f"Failed to load mandatory extension Modules.modules_cmd: {e}")
+        print(f"Failed to load mandatory extension Modules.modules_cmd: {e}", flush=True)
 
     skipped_missing_extensions: list[str] = []
+    loaded_count = 0
     for module in await load_module_registry():
         extension = str(module.get("extension", "")).strip()
         module_id = str(module.get("id", "")).strip().lower()
@@ -4219,16 +4270,20 @@ async def _run_bot_with_kofi():
             continue
         try:
             await bot.load_extension(extension)
-            print(f"Loaded extension: {extension}")
+            print(f"Loaded extension: {extension}", flush=True)
+            loaded_count += 1
         except commands.ExtensionAlreadyLoaded:
             continue
         except Exception as e:
-            print(f"Failed to load extension {extension}: {e}")
+            print(f"Failed to load extension {extension}: {e}", flush=True)
+
+    print(f"[module-registry] Loaded {loaded_count} extension(s).", flush=True)
 
     if skipped_missing_extensions:
         print(
             f"[module-registry] Skipped {len(skipped_missing_extensions)} unavailable module extension(s): "
-            + ", ".join(skipped_missing_extensions)
+            + ", ".join(skipped_missing_extensions),
+            flush=True,
         )
 
     if kofi_token:
@@ -4247,6 +4302,9 @@ async def _run_bot_with_kofi():
     finally:
         if kofi_server is not None:
             await kofi_server.stop()
+        session = getattr(bot, "http_session", None)
+        if session is not None and not session.closed:
+            await session.close()
 
 
 if __name__ == "__main__":

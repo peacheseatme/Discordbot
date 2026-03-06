@@ -37,6 +37,15 @@
       "category": "configuration"
     },
     {
+      "id": "fun",
+      "extension": "Modules.fun",
+      "path": "Modules/fun.py",
+      "display_name": "Fun Commands",
+      "description": "8ball, flipcoin, hug, kiss, dog, cat, roast, and other fun commands.",
+      "default_enabled": true,
+      "category": "engagement"
+    },
+    {
       "id": "calls",
       "extension": "Modules.calls",
       "path": "Modules/calls.py",
@@ -134,6 +143,15 @@
       "description": "Support information, perks, and support links command.",
       "default_enabled": true,
       "category": "integrations"
+    },
+    {
+      "id": "test_module",
+      "extension": "Modules.test_module",
+      "path": "Modules/test_module.py",
+      "display_name": "Test Module",
+      "description": "Simple test module for verifying module refresh_registry works.",
+      "default_enabled": true,
+      "category": "utilities"
     },
     {
       "id": "tickets",

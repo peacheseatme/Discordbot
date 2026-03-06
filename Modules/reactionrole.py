@@ -18,24 +18,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = BASE_DIR / "Storage" / "Config" / "reactionrole_config.json"
 _CONFIG_LOCK = asyncio.Lock()
 LOGGER = logging.getLogger("coffeecord.reactionrole")
-DEBUG_LOG_PATH = BASE_DIR / ".cursor" / "debug.log"
-
-
-def _dbg_log(run_id: str, hypothesis_id: str, location: str, message: str, data: dict[str, Any]) -> None:
-    try:
-        payload = {
-            "runId": run_id,
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(discord.utils.utcnow().timestamp() * 1000),
-        }
-        DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with DEBUG_LOG_PATH.open("a", encoding="utf-8") as fp:
-            fp.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except Exception:
-        return
 
 
 @dataclass
@@ -218,20 +200,6 @@ class RRChannelSelect(discord.ui.ChannelSelect):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         selected = self.values[0] if self.values else None
-        # region agent log
-        _dbg_log(
-            "rr_channel_pick_v1",
-            "H1",
-            "Modules/reactionrole.py:RRChannelSelect.callback",
-            "Channel select callback executed",
-            {
-                "selected_type": type(selected).__name__ if selected is not None else None,
-                "selected_id": getattr(selected, "id", None),
-                "selected_repr": str(selected)[:200] if selected is not None else None,
-                "is_textchannel_instance": isinstance(selected, discord.TextChannel),
-            },
-        )
-        # endregion
         resolved_channel: Optional[discord.TextChannel] = None
         if isinstance(selected, discord.TextChannel):
             resolved_channel = selected
@@ -242,19 +210,6 @@ class RRChannelSelect(discord.ui.ChannelSelect):
                 if isinstance(maybe_channel, discord.TextChannel):
                     resolved_channel = maybe_channel
         self.parent_view.channel = resolved_channel
-        # region agent log
-        _dbg_log(
-            "rr_channel_pick_v1",
-            "H5",
-            "Modules/reactionrole.py:RRChannelSelect.callback",
-            "Channel select resolved to guild channel",
-            {
-                "resolved_is_none": resolved_channel is None,
-                "resolved_type": type(resolved_channel).__name__ if resolved_channel is not None else None,
-                "resolved_id": getattr(resolved_channel, "id", None),
-            },
-        )
-        # endregion
         await self.parent_view.refresh(interaction, "Channel selected.")
 
 
@@ -331,20 +286,6 @@ class ReactionRoleSetupView(discord.ui.View):
         self.add_item(RRCancelButton(self))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        # region agent log
-        _dbg_log(
-            "rr_channel_pick_v1",
-            "H2",
-            "Modules/reactionrole.py:ReactionRoleSetupView.interaction_check",
-            "Interaction check evaluated",
-            {
-                "invoker_id": self.invoker_id,
-                "interaction_user_id": interaction.user.id,
-                "allowed": interaction.user.id == self.invoker_id,
-                "custom_id": (interaction.data or {}).get("custom_id") if isinstance(interaction.data, dict) else None,
-            },
-        )
-        # endregion
         if interaction.user.id != self.invoker_id:
             await interaction.response.send_message("This setup belongs to another moderator.", ephemeral=True)
             return False
@@ -363,40 +304,9 @@ class ReactionRoleSetupView(discord.ui.View):
         return embed
 
     async def refresh(self, interaction: discord.Interaction, status: str) -> None:
-        # region agent log
-        _dbg_log(
-            "rr_channel_pick_v1",
-            "H3",
-            "Modules/reactionrole.py:ReactionRoleSetupView.refresh",
-            "View refresh called",
-            {
-                "status": status,
-                "channel_is_none": self.channel is None,
-                "channel_type": type(self.channel).__name__ if self.channel is not None else None,
-                "channel_id": getattr(self.channel, "id", None),
-                "role_id": getattr(self.role, "id", None),
-            },
-        )
-        # endregion
         await interaction.response.edit_message(embed=self._preview_embed(status), view=self)
 
     async def publish(self, interaction: discord.Interaction) -> None:
-        # region agent log
-        _dbg_log(
-            "rr_channel_pick_v1",
-            "H4",
-            "Modules/reactionrole.py:ReactionRoleSetupView.publish",
-            "Publish clicked",
-            {
-                "channel_is_none": self.channel is None,
-                "channel_type": type(self.channel).__name__ if self.channel is not None else None,
-                "channel_id": getattr(self.channel, "id", None),
-                "role_id": getattr(self.role, "id", None),
-                "mode": self.mode,
-                "action_text": self.action_text[:80],
-            },
-        )
-        # endregion
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
             return
@@ -725,20 +635,6 @@ class ReactionRoleCog(
             default_mode=cfg.get("default_mode", "button"),
             default_logging=bool(cfg.get("default_logging", False)),
         )
-        # region agent log
-        _dbg_log(
-            "rr_channel_pick_v1",
-            "H3",
-            "Modules/reactionrole.py:ReactionRoleCog.reactionrole_create",
-            "Setup view created",
-            {
-                "invoker_id": interaction.user.id,
-                "guild_id": interaction.guild.id,
-                "view_id": id(view),
-                "default_mode": cfg.get("default_mode", "button"),
-            },
-        )
-        # endregion
         await interaction.response.send_message(embed=view._preview_embed(), view=view, ephemeral=True)
 
     @app_commands.command(name="list", description="List reaction role panels in this server.")

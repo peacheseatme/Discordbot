@@ -19,22 +19,21 @@ else:
         "tickets.py must be imported from the main bot script after bot and tree are defined"
     )
 
+from Modules import json_cache
+
 _TICKETS_BASE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Storage")
 TICKETS_FILE = os.path.join(_TICKETS_BASE, "Data", "tickets.json")
 _TRANSCRIPTS_DIR = os.path.join(_TICKETS_BASE, "Data", "ticket_transcripts")
 os.makedirs(_TRANSCRIPTS_DIR, exist_ok=True)
 ticket_group = discord.app_commands.Group(name="ticket", description="Ticket system commands")
 
-# ---------- JSON HELPERS ----------
+
 def load_json(path, default=None):
-    if not os.path.exists(path):
-        return default or {}
-    with open(path, "r") as f:
-        return json.load(f)
+    return json_cache.get(path, default if default is not None else {})
+
 
 def save_json(path, data):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=4)
+    json_cache.set_(path, data)
 
 
 def _dispatch_ticket_event(

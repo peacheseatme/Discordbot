@@ -1,23 +1,24 @@
 {
   "1384771470860746753": {
+    "adaptive_slowmode": true,
+    "applications": true,
     "automod": true,
+    "autorole": true,
+    "calls": true,
+    "kofi": true,
+    "leveling": true,
     "logging": true,
+    "modules_cmd": true,
+    "muterole": true,
+    "nickname": true,
+    "polls": true,
+    "reactionrole": true,
+    "setup_wizard": true,
+    "support": true,
+    "test_module": true,
     "tickets": true,
     "translate": true,
-    "reactionrole": true,
-    "autorole": true,
-    "welcome_leave": true,
-    "setup_wizard": true,
-    "leveling": true,
-    "kofi": true,
     "verification": true,
-    "polls": true,
-    "applications": true,
-    "adaptive_slowmode": true,
-    "muterole": true,
-    "calls": true,
-    "nickname": true,
-    "support": true,
-    "modules_cmd": true
+    "welcome_leave": true
   }
 }
