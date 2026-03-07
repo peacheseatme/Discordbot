@@ -15,16 +15,27 @@ VENV_ACTIVATE="${VENV_DIR}/bin/activate"
 PYTHON_BIN="${VENV_DIR}/bin/python"
 PIP_BIN="${VENV_DIR}/bin/pip"
 
+# Default paths (overridable via Storage/Config/c-cord.json)
 BOT_ENTRY="${SCRIPT_DIR}/Src/Bot.py"
 ENV_FILE="${SCRIPT_DIR}/Src/.env"
 TICKET_ENV_FILE="${SCRIPT_DIR}/Src/ticket.env"
 LOG_DIR="${SCRIPT_DIR}/Storage/Logs"
 TEMP_DIR="${SCRIPT_DIR}/Storage/Temp"
-PID_FILE="${TEMP_DIR}/bot.pid"
-LOG_FILE="${LOG_DIR}/bot.log"
-ROTATE_PREFIX="${LOG_DIR}/bot_"
 MAX_LOG_BYTES=$((10 * 1024 * 1024))
 MAX_ROTATED=5
+
+# Load config overrides if present
+CC_CONFIG_FILE="${SCRIPT_DIR}/Storage/Config/c-cord.json"
+if [[ -f "${CC_CONFIG_FILE}" ]] && command -v python3 >/dev/null 2>&1; then
+    eval "$(CC_SCRIPT_DIR="${SCRIPT_DIR}" CC_CONFIG_FILE="${CC_CONFIG_FILE}" \
+        python3 "${SCRIPT_DIR}/scripts/get_cc_config.py" 2>/dev/null)" 2>/dev/null || true
+fi
+
+PID_FILE="${TEMP_DIR}/bot.pid"
+NGROK_PID_FILE="${TEMP_DIR}/ngrok.pid"
+NGROK_LOG="${LOG_DIR}/ngrok.log"
+LOG_FILE="${LOG_DIR}/bot.log"
+ROTATE_PREFIX="${LOG_DIR}/bot_"
 
 _usage() {
     echo -e "${BOLD}Usage:${RESET} c-cord <command> [flags]"
@@ -93,6 +104,145 @@ _cleanup_stale_pid() {
         if ! _is_pid_running "${pid}"; then
             rm -f "${PID_FILE}"
         fi
+    fi
+    if [[ -f "${NGROK_PID_FILE}" ]]; then
+        local pid
+        pid="$(<"${NGROK_PID_FILE}")" || true
+        if ! _is_pid_running "${pid}"; then
+            rm -f "${NGROK_PID_FILE}"
+        fi
+    fi
+}
+
+# ── Ko-fi / ngrok helpers ────────────────────────────────────────────────────
+_get_kofi_port() {
+    [[ -f "${ENV_FILE}" ]] || { echo "5000"; return; }
+    local line
+    while IFS= read -r line; do
+        if [[ "${line}" =~ ^KOFI_PORT=([0-9]+) ]]; then
+            echo "${BASH_REMATCH[1]}"
+            return
+        fi
+    done < "${ENV_FILE}"
+    echo "5000"
+}
+
+_is_kofi_configured() {
+    [[ -f "${ENV_FILE}" ]] || return 1
+    grep -qE '^KOFI_VERIFICATION_TOKEN=.+$' "${ENV_FILE}" 2>/dev/null
+}
+
+_ngrok_bin() {
+    if command -v ngrok >/dev/null 2>&1; then
+        echo "ngrok"
+        return
+    fi
+    local local_ngrok="${SCRIPT_DIR}/Storage/Tools/ngrok"
+    if [[ -x "${local_ngrok}" ]]; then
+        echo "${local_ngrok}"
+        return
+    fi
+    echo ""
+}
+
+_ensure_ngrok() {
+    local bin
+    bin="$(_ngrok_bin)"
+    if [[ -n "${bin}" ]]; then
+        return 0
+    fi
+    info "ngrok not found. Attempting to install..."
+    mkdir -p "${SCRIPT_DIR}/Storage/Tools"
+    local arch url
+    arch="$(uname -m)"
+    case "${arch}" in
+        x86_64|amd64) arch="amd64" ;;
+        aarch64|arm64) arch="arm64" ;;
+        *) arch="amd64" ;;
+    esac
+    url="https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-${arch}.tgz"
+    local tmpdir
+    tmpdir="$(mktemp -d)"
+    if curl -sSLf "${url}" 2>/dev/null | tar xz -C "${tmpdir}" 2>/dev/null; then
+        local extracted
+        extracted="$(find "${tmpdir}" -name ngrok -type f 2>/dev/null | head -1)"
+        if [[ -n "${extracted}" ]]; then
+            mv "${extracted}" "${SCRIPT_DIR}/Storage/Tools/ngrok"
+            chmod +x "${SCRIPT_DIR}/Storage/Tools/ngrok"
+            ok "ngrok installed to Storage/Tools/ngrok"
+            rm -rf "${tmpdir}"
+            return 0
+        fi
+    fi
+    rm -rf "${tmpdir}"
+    if command -v snap >/dev/null 2>&1; then
+        info "Trying snap install ngrok..."
+        if sudo snap install ngrok 2>/dev/null; then
+            ok "ngrok installed via snap"
+            return 0
+        fi
+    fi
+    err "Could not install ngrok. Install manually: https://ngrok.com/download"
+    err "Then run: ngrok config add-authtoken <your-token>"
+    return 1
+}
+
+_ngrok_enabled() {
+    if [[ -f "${CC_CONFIG_FILE}" ]] && command -v python3 >/dev/null 2>&1; then
+        local enabled
+        enabled="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("ngrok_enabled", True))' "${CC_CONFIG_FILE}" 2>/dev/null)" || true
+        [[ "${enabled}" == "True" || "${enabled}" == "true" ]] || return 1
+    fi
+    return 0
+}
+
+_start_ngrok() {
+    _is_kofi_configured || return 0
+    _ngrok_enabled || return 0
+
+    if [[ -f "${NGROK_PID_FILE}" ]]; then
+        local pid
+        pid="$(<"${NGROK_PID_FILE}")" || true
+        if _is_pid_running "${pid}"; then
+            info "ngrok already running (PID ${pid})"
+            return 0
+        fi
+        rm -f "${NGROK_PID_FILE}"
+    fi
+
+    _ensure_ngrok || return 1
+    local bin port
+    bin="$(_ngrok_bin)"
+    port="$(_get_kofi_port)"
+
+    echo "ngrok started at $(date '+%Y-%m-%d %H:%M:%S')" >> "${NGROK_LOG}"
+    "${bin}" http "${port}" --log=stdout >> "${NGROK_LOG}" 2>&1 &
+    local pid=$!
+    echo "${pid}" > "${NGROK_PID_FILE}"
+    sleep 2
+    if _is_pid_running "${pid}"; then
+        ok "ngrok started (PID ${pid}) — port ${port}"
+        info "Set Ko-fi webhook to: https://<ngrok-url>/kofi-webhook"
+    else
+        rm -f "${NGROK_PID_FILE}"
+        warn "ngrok may have failed. Check Storage/Logs/ngrok.log"
+    fi
+}
+
+_stop_ngrok() {
+    [[ -f "${NGROK_PID_FILE}" ]] || return 0
+    local pid
+    pid="$(<"${NGROK_PID_FILE}")" || true
+    rm -f "${NGROK_PID_FILE}"
+    if _is_pid_running "${pid}"; then
+        kill "${pid}" 2>/dev/null || true
+        local waited=0
+        while _is_pid_running "${pid}" && (( waited < 5 )); do
+            sleep 0.5
+            waited=$((waited + 1))
+        done
+        _is_pid_running "${pid}" && kill -9 "${pid}" 2>/dev/null || true
+        ok "ngrok stopped"
     fi
 }
 
@@ -277,6 +427,8 @@ _start_bot() {
 
     ok "Coffeecord started (PID ${pid})"
     ok "Logging to Storage/Logs/bot.log"
+
+    _start_ngrok || true
 }
 
 # ── stop ─────────────────────────────────────────────────────────────────────
@@ -327,6 +479,7 @@ _stop_bot() {
     fi
 
     rm -f "${PID_FILE}"
+    _stop_ngrok
     ok "Coffeecord stopped."
 }
 
@@ -360,6 +513,13 @@ _status_bot() {
             echo "  PID     : ${pid}"
             echo "  Uptime  : ${uptime}"
             echo "  Log     : Storage/Logs/bot.log  (last line: ${last_line:-<empty>})"
+            if [[ -f "${NGROK_PID_FILE}" ]]; then
+                local ngrok_pid
+                ngrok_pid="$(<"${NGROK_PID_FILE}" 2>/dev/null)" || true
+                if [[ "${ngrok_pid}" =~ ^[0-9]+$ ]] && _is_pid_running "${ngrok_pid}"; then
+                    echo "  ngrok   : running (PID ${ngrok_pid})"
+                fi
+            fi
             if [[ "${verbose}" == "true" && -f "${LOG_FILE}" ]]; then
                 echo ""
                 echo "  ── Last 10 log lines ──────────────────────────────"

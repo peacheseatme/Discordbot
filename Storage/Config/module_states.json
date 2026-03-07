@@ -4,6 +4,7 @@
     "applications": true,
     "automod": true,
     "autorole": true,
+    "fun": false,
     "calls": true,
     "kofi": true,
     "leveling": true,
@@ -17,7 +18,7 @@
     "support": true,
     "test_module": true,
     "tickets": true,
-    "translate": true,
+    "translate": false,
     "verification": true,
     "welcome_leave": true
   }

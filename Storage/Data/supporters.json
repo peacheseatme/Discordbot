@@ -21,6 +21,16 @@
       "kofi_transaction_ids": [
         "test-curl-123"
       ]
+    },
+    "1390501770437984377": {
+      "discord_id": 1390501770437984377,
+      "email": "mikasayeagerlol919@gmail.com",
+      "tier": "donation",
+      "active": true,
+      "first_seen": "2026-03-05T23:57:36",
+      "last_payment": "2026-03-05T23:57:36",
+      "total_usd": 0.0,
+      "kofi_transaction_ids": []
     }
   },
   "unlinked_donations": [

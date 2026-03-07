@@ -22,13 +22,50 @@ The bot is controlled via `bot.sh` or the `c-cord` symlink.
 | `module refresh_registry` | Alias for module refresh |
 | `module refresh --dry-run` | Preview additions without writing |
 
+## Config file
+
+`Storage/Config/c-cord.json` optionally overrides paths and limits for `c-cord start` / `restart`:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `bot_entry` | `Src/Bot.py` | Bot entry script |
+| `env_file` | `Src/.env` | Environment file |
+| `log_dir` | `Storage/Logs` | Log directory |
+| `temp_dir` | `Storage/Temp` | Temp directory |
+| `ticket_env_file` | `Src/ticket.env` | Ticket config |
+| `max_log_bytes` | `10485760` | Rotate log when larger (bytes) |
+| `max_rotated` | `5` | Max rotated log files to keep |
+| `ngrok_enabled` | `true` | Start ngrok with bot when Ko-fi is configured |
+
+Paths are relative to the project root unless absolute. The config is loaded automatically when present.
+
+## ngrok (Ko-fi webhooks)
+
+When `KOFI_VERIFICATION_TOKEN` is set in `Src/.env`, `c-cord start` and `restart` automatically:
+
+1. Install ngrok if missing (download to `Storage/Tools/` or try `snap install`)
+2. Start ngrok to expose `KOFI_PORT` (default 5000)
+3. Stop ngrok when `c-cord stop` runs
+
+Set `ngrok_enabled: false` in `Storage/Config/c-cord.json` to run ngrok manually. Run `ngrok config add-authtoken <token>` once after installing.
+
 ## Paths
 
-- **Entry**: `Src/Bot.py`
+- **Entry**: `Src/Bot.py` (overridable via config)
 - **Env**: `Src/.env` (DISCORD_TOKEN, etc.)
 - **Logs**: `Storage/Logs/bot.log`
 - **PID**: `Storage/Temp/bot.pid`
 - **Venv**: `.venv/`
+
+## Ko-fi setup
+
+Use the helper script to add Ko-fi webhook configuration:
+
+```bash
+./scripts/add_kofi.sh
+```
+
+This prompts for `KOFI_VERIFICATION_TOKEN` and `KOFI_PORT`, updates `Src/.env`, and prints next steps. Then run `c-cord restart` — ngrok starts automatically.
 
 ## Module refresh
 
