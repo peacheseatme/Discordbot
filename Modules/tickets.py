@@ -191,52 +191,62 @@ class CreateTicketButton(ui.Button):
 
 # ---------- CREATE TICKET ----------
 async def create_ticket(interaction: Interaction, ticket_type: str, guild_id: str):
+    await interaction.response.defer(ephemeral=True)
     guild = interaction.guild
     member = interaction.user
 
-    data = load_json(TICKETS_FILE, {})
-    cfg = data[guild_id]
-    support_roles = cfg["support_roles"]
+    try:
+        data = load_json(TICKETS_FILE, {})
+        cfg = data.get(guild_id)
+        if not cfg:
+            await interaction.followup.send("❌ Ticket system not set up for this server.", ephemeral=True)
+            return
 
-    overwrites = {
-        guild.default_role: discord.PermissionOverwrite(view_channel=False),
-        member: discord.PermissionOverwrite(view_channel=True, send_messages=True),
-        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
-    }
+        support_roles = cfg.get("support_roles", [])
 
-    for rid in support_roles:
-        role = guild.get_role(rid)
-        if role:
-            overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            member: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        }
 
-    channel = await guild.create_text_channel(
-        name=f"{ticket_type.lower()}-{member.name}",
-        overwrites=overwrites
-    )
+        for rid in support_roles:
+            role = guild.get_role(rid)
+            if role:
+                overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True)
 
-    cfg["tickets"][str(channel.id)] = {
-        "user": member.id,
-        "type": ticket_type,
-        "status": "open",
-        "claimed_by": None
-    }
-    save_json(TICKETS_FILE, data)
+        channel = await guild.create_text_channel(
+            name=f"{ticket_type.lower()}-{member.name}",
+            overwrites=overwrites
+        )
 
-    embed = discord.Embed(
-        title=f"{ticket_type} Ticket",
-        description=cfg["ticket_message"],
-        color=discord.Color.green()
-    )
+        cfg.setdefault("tickets", {})[str(channel.id)] = {
+            "user": member.id,
+            "type": ticket_type,
+            "status": "open",
+            "claimed_by": None
+        }
+        save_json(TICKETS_FILE, data)
 
-    await channel.send(embed=embed, view=TicketControlPanel(guild_id, channel.id))
-    _dispatch_ticket_event(
-        interaction.guild,
-        interaction.user,
-        "create",
-        channel.id,
-        f"type={ticket_type}",
-    )
-    await interaction.response.send_message(f"✅ Ticket created: {channel.mention}", ephemeral=True)
+        embed = discord.Embed(
+            title=f"{ticket_type} Ticket",
+            description=cfg.get("ticket_message", "Click below to create a ticket."),
+            color=discord.Color.green()
+        )
+
+        await channel.send(embed=embed, view=TicketControlPanel(guild_id, channel.id))
+        _dispatch_ticket_event(
+            interaction.guild,
+            interaction.user,
+            "create",
+            channel.id,
+            f"type={ticket_type}",
+        )
+        await interaction.followup.send(f"✅ Ticket created: {channel.mention}", ephemeral=True)
+    except discord.Forbidden:
+        await interaction.followup.send("❌ I don't have permission to create channels.", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Failed to create ticket: {e}", ephemeral=True)
 
 
 # ---------- CONTROL PANEL ----------

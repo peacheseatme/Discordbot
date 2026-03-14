@@ -20,7 +20,7 @@ FIRST-TIME SETUP:
   'c-cord' command is available in your PATH.
 
 INVITE THE BOT TO YOUR SERVER:
-  https://discord.com/oauth2/authorize?client_id=1379645937064087563&permissions=8&scope=bot+applications.commands
+  https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot+applications.commands
 
 DAILY USAGE (from anywhere in your terminal, after setup):
 

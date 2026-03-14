@@ -5,6 +5,7 @@ Reduces disk I/O on every message, level card, etc.
 
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,13 @@ def _path_key(path: str | Path) -> str:
     return str(Path(path).resolve())
 
 
+def _copy_if_mutable(obj: Any) -> Any:
+    """Return a deep copy for mutable types so callers cannot corrupt the cache."""
+    if isinstance(obj, (dict, list)):
+        return copy.deepcopy(obj)
+    return obj
+
+
 def get(path: str | Path, default: Any = None) -> Any:
     """Load JSON from cache or disk. Returns cached copy on hit."""
     key = _path_key(path)
@@ -23,16 +31,16 @@ def get(path: str | Path, default: Any = None) -> Any:
         return _CACHE[key]
     p = Path(path)
     if not p.exists():
-        _CACHE[key] = default if default is not None else {}
-        return _CACHE[key]
+        base = default if default is not None else {}
+        return _copy_if_mutable(base)
     try:
         with p.open("r", encoding="utf-8") as fp:
             data = json.load(fp)
         _CACHE[key] = data
         return data
     except (OSError, json.JSONDecodeError):
-        _CACHE[key] = default if default is not None else {}
-        return _CACHE[key]
+        base = default if default is not None else {}
+        return _copy_if_mutable(base)
 
 
 def set_(path: str | Path, data: Any) -> None:

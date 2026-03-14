@@ -56,6 +56,10 @@ _usage() {
     echo "  logs                      Follow log (tail -f)"
     echo "  logs -n N                 Last N lines, no follow"
     echo ""
+    echo "  console                   Live console — tail bot log (commands, errors, etc.)"
+    echo "  console -n N              Last N lines, no follow"
+    echo "  console clear             Clear the bot log file"
+    echo ""
     echo "  update                    git pull → pip install → restart"
     echo "  update -f / --force       Continue even if git pull fails"
     echo ""
@@ -69,18 +73,33 @@ _ensure_runtime_dirs() {
 }
 
 _ensure_ticket_env() {
-    [[ -f "${TICKET_ENV_FILE}" ]] && return 0
-    info "Creating Src/ticket.env with default settings..."
-    {
-        echo "# ── Ticket system configuration ────────────────────────────"
-        echo "# Uncomment and fill in values to override built-in defaults."
-        echo "# Restart the bot after making changes."
-        echo "#"
-        echo "# TICKET_LOG_CHANNEL_ID=   # Channel ID to post ticket event logs"
-        echo "# TICKET_MAX_PER_USER=3    # Max open tickets per user (0 = unlimited)"
-        echo "# TICKET_TRANSCRIPT_ENABLED=true  # Save transcript HTML on close"
-    } > "${TICKET_ENV_FILE}"
-    ok "Src/ticket.env created."
+    local secret
+    secret="$(openssl rand -hex 16 2>/dev/null)"
+    if [[ -z "${secret}" ]]; then
+        secret="$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 32)"
+    fi
+    [[ -n "${secret}" ]] || secret="$(date +%s%N | sha256sum 2>/dev/null | head -c 32)"
+
+    if [[ ! -f "${TICKET_ENV_FILE}" ]]; then
+        info "Creating Src/ticket.env with default settings..."
+        {
+            echo "# ── Ticket system configuration ────────────────────────────"
+            echo "# TICKET_SECRET is auto-generated for signing ticket exports."
+            echo "# Restart the bot after making changes."
+            echo "#"
+            echo "TICKET_SECRET=${secret}"
+            echo "#"
+            echo "# TICKET_LOG_CHANNEL_ID=   # Channel ID to post ticket event logs"
+            echo "# TICKET_MAX_PER_USER=3    # Max open tickets per user (0 = unlimited)"
+            echo "# TICKET_TRANSCRIPT_ENABLED=true  # Save transcript HTML on close"
+        } > "${TICKET_ENV_FILE}"
+        ok "Src/ticket.env created."
+    elif ! grep -qE '^TICKET_SECRET=' "${TICKET_ENV_FILE}" 2>/dev/null; then
+        info "Adding TICKET_SECRET to Src/ticket.env..."
+        echo "" >> "${TICKET_ENV_FILE}"
+        echo "TICKET_SECRET=${secret}" >> "${TICKET_ENV_FILE}"
+        ok "TICKET_SECRET added."
+    fi
 }
 
 _is_pid_running() {
@@ -222,7 +241,13 @@ _start_ngrok() {
     sleep 2
     if _is_pid_running "${pid}"; then
         ok "ngrok started (PID ${pid}) — port ${port}"
-        info "Set Ko-fi webhook to: https://<ngrok-url>/kofi-webhook"
+        local host
+        host="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("kofi_webhook_host",""))' "${CC_CONFIG_FILE}" 2>/dev/null)" || true
+        if [[ -n "${host}" ]]; then
+            info "Ko-fi webhook URL: https://${host}/kofi-webhook"
+        else
+            info "Set Ko-fi webhook to: https://<ngrok-url>/kofi-webhook (add kofi_webhook_host in c-cord.json)"
+        fi
     else
         rm -f "${NGROK_PID_FILE}"
         warn "ngrok may have failed. Check Storage/Logs/ngrok.log"
@@ -556,6 +581,41 @@ _logs_bot() {
     tail -f "${LOG_FILE}"
 }
 
+# ── console ───────────────────────────────────────────────────────────────────
+# Live view of bot output (commands, errors, etc.). Same as logs with a header.
+_console_bot() {
+    _ensure_runtime_dirs
+
+    if [[ "${1:-}" == "clear" ]]; then
+        if [[ -f "${LOG_FILE}" ]]; then
+            : > "${LOG_FILE}"
+            ok "Bot log cleared."
+        else
+            info "No log file yet."
+        fi
+        return 0
+    fi
+
+    if [[ ! -f "${LOG_FILE}" ]]; then
+        info "No log file yet. Start the bot with c-cord start"
+        return 0
+    fi
+
+    if [[ "${1:-}" == "-n" ]]; then
+        local n="${2:-}"
+        if [[ ! "${n}" =~ ^[0-9]+$ ]]; then
+            err "Usage: c-cord console -n <number>"
+            exit 1
+        fi
+        echo -e "${BOLD}── Last ${n} lines ──${RESET}"
+        tail -n "${n}" "${LOG_FILE}"
+        return 0
+    fi
+
+    echo -e "${BOLD}── Live console (Ctrl+C to exit) ──${RESET}"
+    tail -f "${LOG_FILE}"
+}
+
 # ── update ───────────────────────────────────────────────────────────────────
 # Flags:
 #   -f / --force   Continue even when git pull fails (network down, dirty tree, etc.)
@@ -682,6 +742,9 @@ main() {
             ;;
         logs)
             _logs_bot "$@"
+            ;;
+        console)
+            _console_bot "$@"
             ;;
         update)
             _update_bot "$@"

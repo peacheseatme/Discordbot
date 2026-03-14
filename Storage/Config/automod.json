@@ -118,7 +118,7 @@
   },
   "1384771470860746753": {
     "enabled": true,
-    "count_rule_violations_as_warns": true,
+    "count_rule_violations_as_warns": false,
     "log_channel_id": 1388577818752974970,
     "whitelist": {
       "roles": [
@@ -132,28 +132,23 @@
     "bad_words": {
       "enabled": true,
       "words": [],
-      "action": "kick",
+      "action": "warn",
       "delete_message": true,
-      "escalation": [
-        {
-          "count": 2,
-          "action": "ban"
-        }
-      ]
+      "escalation": []
     },
     "spam": {
       "enabled": true,
-      "max_messages": 4,
-      "per_seconds": 4,
-      "action": "kick",
-      "timeout_seconds": 60,
+      "max_messages": 6,
+      "per_seconds": 5,
+      "action": "timeout",
+      "timeout_seconds": 120,
       "escalation": []
     },
     "duplicate_messages": {
       "enabled": true,
-      "window_seconds": 20,
-      "min_duplicates": 2,
-      "action": "kick",
+      "window_seconds": 30,
+      "min_duplicates": 3,
+      "action": "delete",
       "escalation": []
     },
     "links": {
@@ -162,39 +157,37 @@
       "block_links": true,
       "allowed_domains": [],
       "allowed_invite_codes": [],
-      "action": "kick",
+      "action": "delete",
       "escalation": []
     },
     "mentions": {
       "enabled": true,
-      "max_mentions": 3,
-      "action": "timeout",
-      "escalation": [],
-      "timeout_seconds": 600
+      "max_mentions": 5,
+      "action": "warn",
+      "escalation": []
     },
     "caps": {
       "enabled": true,
-      "min_length": 6,
-      "caps_percent": 65,
-      "action": "timeout",
-      "escalation": [],
-      "timeout_seconds": 300
+      "min_length": 10,
+      "caps_percent": 75,
+      "action": "delete",
+      "escalation": []
     },
     "attachments": {
-      "enabled": true,
-      "max_attachments": 2,
-      "max_embeds": 1,
+      "enabled": false,
+      "max_attachments": 6,
+      "max_embeds": 3,
       "action": "delete",
       "escalation": []
     },
     "custom_regex": {
-      "enabled": true,
+      "enabled": false,
       "rules": [],
       "escalation": []
     },
     "anti_selfbot": {
       "enabled": true,
-      "action": "ban",
+      "action": "delete",
       "use_builtin_patterns": true,
       "builtin_patterns": [
         "[MN][A-Za-z\\d]{23}\\.[\\w-]{6}\\.[\\w-]{27}",
@@ -206,18 +199,17 @@
     },
     "new_user": {
       "enabled": true,
-      "max_account_age_days": 30,
-      "action": "timeout",
+      "max_account_age_days": 3,
+      "action": "warn",
       "channels_only": [],
-      "escalation": [],
-      "timeout_seconds": 1800
+      "escalation": []
     },
     "anti_raid": {
       "enabled": true,
-      "window_seconds": 6,
-      "join_threshold": 5,
-      "cooldown_seconds": 300,
-      "action": "ban",
+      "window_seconds": 10,
+      "join_threshold": 12,
+      "cooldown_seconds": 60,
+      "action": "timeout",
       "timeout_seconds": 300
     },
     "warn_thresholds": {

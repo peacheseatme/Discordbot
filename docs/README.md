@@ -6,6 +6,7 @@ Documentation for the Coffeecord Discord bot: architecture, modules, commands, a
 
 | Folder | Description |
 |--------|--------------|
+| [installation/](installation/) | Install script, Linux, and Windows setup |
 | [modules/](modules/) | Module creation, registry, discovery, types, and patterns |
 | [commands/](commands/) | Slash commands, prefix commands, groups, and checks |
 | [architecture/](architecture/) | Bot loading, events, CLI, and integration patterns |
@@ -13,6 +14,7 @@ Documentation for the Coffeecord Discord bot: architecture, modules, commands, a
 
 ## Quick Links
 
+- [Installation guide](installation/README.md) — Script, Linux, Windows
 - [Creating a new module](modules/creating-modules.md)
 - [How slash commands work](commands/slash-commands.md)
 - [How prefix commands work](commands/prefix-commands.md)

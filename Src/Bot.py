@@ -33,6 +33,9 @@ from contextlib import asynccontextmanager
 import aiohttp
 
 load_dotenv()
+# Load ticket.env for TICKET_SECRET (path relative to project root)
+_ticket_env = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Src", "ticket.env")
+load_dotenv(_ticket_env)
 token = os.getenv('DISCORD_TOKEN')
 # ───────── staff applications – storage helpers ─────────
 # Path setup (must be before Modules import)
@@ -67,11 +70,12 @@ intents.message_content = True
 intents.members = True
 ENABLE_PRESENCE_INTENT = os.getenv("ENABLE_PRESENCE_INTENT", "1").strip().lower() in {"1", "true", "yes", "on"}
 intents.presences = ENABLE_PRESENCE_INTENT
-OWNER_ID = 1168282467162136656
 
 bot = commands.Bot(command_prefix=".", intents=intents)
 
 tree = bot.tree
+
+OWNER_ID = 0  # Replace with your Discord user ID
 
 
 def _dispatch_module_log_event(
@@ -132,8 +136,7 @@ def _get_leveling_module() -> typing.Any:
     return _leveling_module
 
 GUILD_IDS = [
-    1212210181044183171,  # Replace with your guild IDs
-    # Add more guild IDs for testing here
+    0,  # Replace with your guild ID(s)
 ]
 
 logging_enabled = True  # Toggle to enable/disable logs
@@ -142,15 +145,15 @@ log_channel_id = None   # Will be set with !log start
 authoroles = set()
 autorole_config = {}
 verify_config = {}
-GUILD_ID = 1212210181044183171
+GUILD_ID = 0  # Replace with your guild ID
 CONFIG_FILE = os.path.join(_storage_dir, "Config", "autorole_config.json")
-BOT_OWNER_ID = 1168282467162136656
-GALAXY_BOT_SERVER_ID = 1384771470860746753
-PERMANENT_INVITE = "https://discord.gg/wpHpe5fwuT"
+BOT_OWNER_ID = 0  # Replace with your Discord user ID
+GALAXY_BOT_SERVER_ID = 0  # Replace with your guild ID
+PERMANENT_INVITE = "https://discord.gg/xxxxxxxx"  # Replace with your support server invite
 DONATION_URL = "https://ko-fi.com/coffeecord"
 GITHUB_URL = "https://github.com/peacheseatme/Discordbot"  # TODO: replace with real URL
 TOPGG_URL = "https://top.gg/bot/YOUR_BOT_ID"  # TODO: replace with real bot ID
-BOT_INVITE_URL = "https://discord.com/oauth2/authorize?client_id=1390501770437984377&permissions=8&scope=bot%20applications.commands"
+BOT_INVITE_URL = "https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot%20applications.commands"
 SUPPORT_SERVER = PERMANENT_INVITE
 BOT_VERSION = "1.0.0"  # TODO: keep updated
 SUPPORTERS_FILE = os.path.join(_storage_dir, "Data", "supporters.json")
@@ -1092,7 +1095,7 @@ async def loading(ctx):
     await asyncio.sleep(1)
     await msg.delete()  # Remove the message after showing it's done
     
-GUILD_ID = 1212210181044183171
+GUILD_ID = 0  # Replace with your guild ID
 
 LOGGING_FILE = os.path.join(_storage_dir, "Config", "logging.json")
 
@@ -2723,9 +2726,7 @@ async def on_guild_join(guild: discord.Guild):
     if guild_has_nsfw(guild):
         try:
             if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
-                await guild.system_channel.send(
-                    "⚠️ Coffeecord cannot operate in servers containing NSFW channels.\nLeaving this server."
-                )
+                await guild.system_channel.send(LEAVE_MSG)
         except Exception:
             pass
         await guild.leave()
@@ -2736,16 +2737,15 @@ async def on_guild_join(guild: discord.Guild):
     class WelcomeButtons(discord.ui.View):
         def __init__(self):
             super().__init__(timeout=None)
-            # Proper way to add link buttons
             self.add_item(discord.ui.Button(
                 label="Support Server",
                 style=discord.ButtonStyle.link,
-                url="https://discord.gg/zBpyzhNcVy"
+                url=SUPPORT_SERVER
             ))
             self.add_item(discord.ui.Button(
                 label="Invite Me",
                 style=discord.ButtonStyle.link,
-                url="https://discord.com/oauth2/authorize?client_id=1390501770437984377&response_type=code&redirect_uri=https%3A%2F%2Fdiscord.com%2Foauth2%2Fauthorize%3Fclient_id%3D1390501770437984377&integration_type=0&scope=applications.commands+email"
+                url=BOT_INVITE_URL
             ))
 
         @discord.ui.button(label="Getting Started", style=discord.ButtonStyle.primary)
@@ -2755,7 +2755,7 @@ async def on_guild_join(guild: discord.Guild):
                 "• `/logging config` — enable logging\n"
                 "• `/autorole` — set automatic roles\n"
                 "• `/verifyconfig` — configure verification\n"
-                "• `/ticket_setup - setup tickets\n"
+                "• `/ticket_setup` — setup tickets\n"
                 "• Need help? Join the support server!",
                 ephemeral=True
             )
@@ -3001,6 +3001,43 @@ async def on_voice_state_update(member, before, after):
         active_vc_members.setdefault(guild_id, {})[user_id] = asyncio.get_event_loop().time()
     elif before.channel is not None and after.channel is None:
         await _get_leveling_module().award_voice_xp(bot, member, active_vc_members)
+
+# ─── Console logging: all commands and processes ─────────────────────────────
+def _log_cmd(prefix: str, name: str, user: discord.abc.User, guild: discord.Guild | None, channel: discord.abc.Messageable | None) -> None:
+    """Log command invocation to stdout (ends up in bot.log via c-cord)."""
+    guild_name = guild.name if guild else "DM"
+    ch_name = getattr(channel, "name", str(channel)) if channel else "?"
+    full = f"{prefix}{name}"
+    print(f"[CMD] {full} | {user} ({user.id}) | {guild_name}#{ch_name}")
+
+
+@bot.listen("on_interaction")
+async def _log_slash_command(interaction: discord.Interaction) -> None:
+    """Log slash command invocations to console."""
+    if interaction.type != discord.InteractionType.application_command:
+        return
+    if interaction.user.bot:
+        return
+    cmd = interaction.command.qualified_name if interaction.command else "unknown"
+    _log_cmd("/", cmd, interaction.user, interaction.guild, interaction.channel)
+
+
+@bot.before_invoke
+async def _log_prefix_command(ctx: commands.Context) -> None:
+    """Log prefix command invocations to console."""
+    if ctx.author.bot or ctx.command is None:
+        return
+    prefix = (ctx.clean_prefix or ".").rstrip()
+    _log_cmd(prefix, ctx.command.qualified_name, ctx.author, ctx.guild, ctx.channel)
+
+
+@bot.after_invoke
+async def _log_prefix_completion(ctx: commands.Context) -> None:
+    """Log prefix command completion to console."""
+    if ctx.author.bot or ctx.command is None:
+        return
+    print(f"[CMD+] .{ctx.command.qualified_name} completed | {ctx.author} | {ctx.guild.name if ctx.guild else 'DM'}")
+
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -4039,8 +4076,9 @@ import base64
 # Keep ticket storage path local to avoid importing ticket module at startup.
 TICKETS_FILE = os.path.join(_storage_dir, "Data", "tickets.json")
 
-# 🔐 CHANGE THIS AND KEEP IT SECRET
-TICKET_SECRET = b"pM!v2czFkjfdOX@FzUWjA0k1$Ze&xlWZ*e4"
+# Load from ticket.env (generated by c-cord start); fallback for direct runs
+_secret = os.getenv("TICKET_SECRET", "").strip()
+TICKET_SECRET = _secret.encode() if _secret else os.urandom(32)
 
 # ---------------- Signing helpers ----------------
 def sign_payload(payload: dict) -> str:

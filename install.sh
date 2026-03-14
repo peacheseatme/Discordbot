@@ -362,5 +362,5 @@ echo -e "    Run ${CYAN}./scripts/add_kofi.sh${RESET} or edit ${CYAN}Src/.env${R
 echo -e "    then run ${CYAN}c-cord restart${RESET}."
 echo ""
 echo -e "  ${BOLD}Invite the bot to your server:${RESET}"
-echo -e "    ${CYAN}https://discord.com/oauth2/authorize?client_id=1379645937064087563&permissions=8&scope=bot+applications.commands${RESET}"
+echo -e "    ${CYAN}https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot+applications.commands${RESET}"
 echo ""

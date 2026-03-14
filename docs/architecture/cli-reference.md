@@ -16,6 +16,9 @@ The bot is controlled via `bot.sh` or the `c-cord` symlink.
 | `status -v` / `status --verbose` | Status + last 10 log lines |
 | `logs` | Follow log (tail -f) |
 | `logs -n N` | Last N lines, no follow |
+| `console` | Live console — tail bot log (commands, errors, etc.) |
+| `console -n N` | Last N lines, no follow |
+| `console clear` | Clear the bot log file |
 | `update` | git pull → pip install → restart |
 | `update -f` | Continue even if git pull fails |
 | `module refresh` | Scan Modules/, add new files to registry |
@@ -36,6 +39,7 @@ The bot is controlled via `bot.sh` or the `c-cord` symlink.
 | `max_log_bytes` | `10485760` | Rotate log when larger (bytes) |
 | `max_rotated` | `5` | Max rotated log files to keep |
 | `ngrok_enabled` | `true` | Start ngrok with bot when Ko-fi is configured |
+| `kofi_webhook_host` | *(none)* | Your ngrok host (e.g. `xxx.ngrok-free.dev`) — used to display the Ko-fi webhook URL on start |
 
 Paths are relative to the project root unless absolute. The config is loaded automatically when present.
 
@@ -48,6 +52,8 @@ When `KOFI_VERIFICATION_TOKEN` is set in `Src/.env`, `c-cord start` and `restart
 3. Stop ngrok when `c-cord stop` runs
 
 Set `ngrok_enabled: false` in `Storage/Config/c-cord.json` to run ngrok manually. Run `ngrok config add-authtoken <token>` once after installing.
+
+Add `kofi_webhook_host` (your ngrok host, e.g. `postmyxedematous-meadow-unswaggering.ngrok-free.dev`) to display the full webhook URL when ngrok starts.
 
 ## Paths
 

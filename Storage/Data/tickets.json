@@ -1,25 +1,39 @@
 {
-    "123456789012345678": {
-        "ticket_channel": 987654321098765432,
-        "support_roles": [
-            111111111111111111,
-            222222222222222222
-        ],
-        "tickets": {
-            "555555555555555555": {
-                "user": 444444444444444444,
-                "claimed_by": 111111111111111111,
-                "messages": [
-                    {
-                        "author": "User#1234",
-                        "content": "Hello, I need help!"
-                    },
-                    {
-                        "author": "Support#5678",
-                        "content": "Sure, what\u2019s the issue?"
-                    }
-                ]
-            }
-        }
+  "123456789012345678": {
+    "ticket_channel": 987654321098765432,
+    "support_roles": [
+      111111111111111111,
+      222222222222222222
+    ],
+    "tickets": {
+      "555555555555555555": {
+        "user": 444444444444444444,
+        "claimed_by": 111111111111111111,
+        "messages": [
+          {
+            "author": "User#1234",
+            "content": "Hello, I need help!"
+          },
+          {
+            "author": "Support#5678",
+            "content": "Sure, what\u2019s the issue?"
+          }
+        ]
+      }
     }
+  },
+  "1384771470860746753": {
+    "ticket_channel": 1427019006279290910,
+    "support_roles": [
+      1387105779353653388,
+      1427020652967366697
+    ],
+    "ticket_types": [
+      "General",
+      "Bot Help",
+      "Other"
+    ],
+    "ticket_message": "Feel free to contact support anytime!",
+    "tickets": {}
+  }
 }
