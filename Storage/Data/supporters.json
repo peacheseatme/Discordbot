@@ -105,6 +105,54 @@
       "timestamp": "2025-06-15T12:00:00",
       "kofi_transaction_id": "test-curl-123",
       "is_subscription_payment": false
+    },
+    {
+      "email": "jo.example@example.com",
+      "amount": "3.00",
+      "amount_usd": 3.0,
+      "timestamp": "2026-03-06T23:51:05Z",
+      "kofi_transaction_id": "00000000-1111-2222-3333-444444444444",
+      "is_subscription_payment": false
+    },
+    {
+      "email": "jo.example@example.com",
+      "amount": "5.00",
+      "amount_usd": 5.0,
+      "timestamp": "2026-03-06T23:51:06Z",
+      "kofi_transaction_id": "00000000-1111-2222-3333-444444444444",
+      "is_subscription_payment": true
+    },
+    {
+      "email": "jo.example@example.com",
+      "amount": "27.95",
+      "amount_usd": 27.95,
+      "timestamp": "2026-03-06T23:51:09Z",
+      "kofi_transaction_id": "00000000-1111-2222-3333-444444444444",
+      "is_subscription_payment": false
+    },
+    {
+      "email": "jo.example@example.com",
+      "amount": "3.00",
+      "amount_usd": 3.0,
+      "timestamp": "2026-03-06T23:51:10Z",
+      "kofi_transaction_id": "00000000-1111-2222-3333-444444444444",
+      "is_subscription_payment": true
+    },
+    {
+      "email": "jo.example@example.com",
+      "amount": "5.00",
+      "amount_usd": 5.0,
+      "timestamp": "2026-03-06T23:51:11Z",
+      "kofi_transaction_id": "00000000-1111-2222-3333-444444444444",
+      "is_subscription_payment": true
+    },
+    {
+      "email": "jo.example@example.com",
+      "amount": "3.00",
+      "amount_usd": 3.0,
+      "timestamp": "2026-03-06T23:51:13Z",
+      "kofi_transaction_id": "00000000-1111-2222-3333-444444444444",
+      "is_subscription_payment": false
     }
   ]
 }
