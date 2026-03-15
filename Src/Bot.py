@@ -387,9 +387,8 @@ COMMAND_CATEGORIES = {
     "Themes": [
         "/theme list", "/theme set", "/theme preview", "/theme info",
         "/theme upload", "/theme delete",
-        "/theme responses presets", "/theme responses set",
-        "/theme responses list", "/theme responses upload", "/theme responses keys",
-        "/theme responses discover", "/theme responses clear",
+        "/theme responses presets", "/theme responses list", "/theme responses upload",
+        "/theme responses discover", "/theme responses keys", "/theme responses clear",
     ],
     "Misc": [
         "/verifyconfig", "/autorole status", "/autorole toggle", "/autorole add",
@@ -2716,10 +2715,12 @@ async def application(interaction: discord.Interaction):
         return await interaction.response.send_message(
             "❌ No application questions have been set up yet.", ephemeral=True)
 
+    if interaction.user.bot:
+        return
+
     # ── Try to open DM channel ─────────────────────────────────────
     try:
-        dm = await interaction.user.create_dm()
-        await dm.send(
+        await interaction.user.send(
             f"📋 **{interaction.guild.name} – Staff Application**\n"
             f"You will be asked **{len(questions)}** questions.\n"
             f"Type your answer to each and send it.  *(You have 5 minutes per question – "
@@ -2735,15 +2736,15 @@ async def application(interaction: discord.Interaction):
         return m.author == interaction.user and isinstance(m.channel, discord.DMChannel)
 
     for idx, q in enumerate(questions, 1):
-        await dm.send(f"**Q{idx}.** {q}")
+        await interaction.user.send(f"**Q{idx}.** {q}")
         try:
             reply: discord.Message = await interaction.client.wait_for(
                 "message", check=dm_check, timeout=300)
         except asyncio.TimeoutError:
-            await dm.send("⌛ Time‑out – application cancelled.")
+            await interaction.user.send("⌛ Time‑out – application cancelled.")
             return
         if reply.content.lower().strip() == "cancel":
-            await dm.send("🚫 Application cancelled.")
+            await interaction.user.send("🚫 Application cancelled.")
             return
         answers.append(f"**Q{idx}.** {q}\n{reply.content}")
 
@@ -3049,6 +3050,24 @@ async def on_voice_state_update(member, before, after):
     user_id = str(member.id)
 
     if before.channel is None and after.channel is not None:
+        # CoffeeCord call: kick if user hasn't used /call join
+        calls = load_calls()
+        guild_calls = calls.get(guild_id, {})
+        call_data = guild_calls.get(str(after.channel.id))
+        if call_data and str(member.id) not in call_data.get("members", []):
+            try:
+                await member.move_to(None)
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+            try:
+                await member.send(
+                    "📞 **You need to use /call join to join this call.**\n"
+                    f"Use `/call join` with channel <#{after.channel.id}> to join."
+                )
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+            return
+
         active_vc_members.setdefault(guild_id, {})[user_id] = asyncio.get_event_loop().time()
     elif before.channel is not None and after.channel is None:
         await _get_leveling_module().award_voice_xp(bot, member, active_vc_members)
@@ -3263,7 +3282,7 @@ async def call(
     }
 
     for member in invited:
-        overwrites[member] = discord.PermissionOverwrite(view_channel=True, connect=True)
+        overwrites[member] = discord.PermissionOverwrite(view_channel=True, connect=False)
 
     channel = await guild.create_voice_channel(
         name=f"{interaction.user.display_name}'s Call",
@@ -3289,7 +3308,7 @@ async def call(
         try:
             msg = (
                 f"📞 **{interaction.user.display_name} is calling you!**\n"
-                f"➡️ Join the call: <#{channel.id}>\n"
+                f"➡️ Use **/call join** to join: <#{channel.id}>\n"
             )
             if password:
                 msg += f"🔑 **Password:** `{password}`"
@@ -3301,6 +3320,7 @@ async def call(
 
     await interaction.followup.send(
         f"📞 Call created: <#{channel.id}>\n"
+        f"Invited users must use **/call join** to join.\n"
         f"{f'🔑 Password: `{password}`' if password else ''}"
     )
     _dispatch_module_log_event(
@@ -3407,8 +3427,8 @@ async def call_add(interaction: discord.Interaction, user: discord.Member):
         await interaction.response.send_message("❌ Call channel no longer exists.", ephemeral=True)
         return
 
-    # Give permissions
-    await channel.set_permissions(user, view_channel=True, connect=True)
+    # Give view_channel only; user must use /call join to get connect
+    await channel.set_permissions(user, view_channel=True, connect=False)
 
     # Add to call data
     if str(user.id) not in info["members"]:
@@ -3428,8 +3448,8 @@ async def call_add(interaction: discord.Interaction, user: discord.Member):
     dm_text = (
         f"📞 **{interaction.user.display_name} is calling you!**\n"
         f"You're invited to join a private CoffeeCord call.\n\n"
-        f"➡️ **Join here:** <#{channel.id}>\n"
-        f"_(The channel will appear once you click the link!)_"
+        f"➡️ Use **/call join** to join: <#{channel.id}>\n"
+        f"_(The channel will appear once you use the command!)_"
         f"{password_note}"
     )
 

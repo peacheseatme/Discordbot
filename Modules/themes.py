@@ -282,6 +282,8 @@ async def send_themed_moderation_dm(
     duration_seconds: int | None = None,
     rule: str | None = None,
 ) -> None:
+    if member.bot:
+        return
     action = action.lower()
     duration = duration_text
     if duration is None and duration_seconds is not None:
@@ -437,32 +439,57 @@ async def _guild_only(interaction: discord.Interaction) -> bool:
 theme_group = app_commands.Group(name="theme", description="Moderation message themes")
 
 
-@theme_group.command(name="list", description="List available themes (presets and custom)")
+@theme_group.command(name="list", description="List available themes (moderation DMs + command responses)")
 @app_commands.checks.has_permissions(manage_guild=True)
 async def theme_list(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
         return
     guild_id = interaction.guild.id
     config = _load_json(THEMES_CONFIG_PATH, {"guilds": {}})
-    current = config.get("guilds", {}).get(str(guild_id), "default")
+    current_mod = config.get("guilds", {}).get(str(guild_id), "default")
     presets = list_preset_themes()
     custom = list_custom_themes(guild_id)
+    response_presets = set(list_response_themes())
     lines = []
-    for name in sorted(set(presets) | set(custom)):
-        badge = " (current)" if name == current else ""
+    for name in sorted(set(presets) | set(custom) | response_presets):
+        badge = " (current)" if name == current_mod else ""
         custom_badge = " [custom]" if name in custom else ""
-        lines.append(f"• **{name}**{badge}{custom_badge}")
+        has_mod = _theme_has_moderation(name)
+        has_resp = name in response_presets
+        if has_mod and has_resp:
+            scope = " — full"
+        elif has_mod:
+            scope = " — moderation only"
+        elif has_resp:
+            scope = " — command responses only"
+        else:
+            scope = ""
+        lines.append(f"• **{name}**{badge}{custom_badge}{scope}")
     embed = discord.Embed(
         title="Available Themes",
         description="\n".join(lines) if lines else "No themes found. Default theme will be used.",
         color=discord.Color.blurple(),
         timestamp=discord.utils.utcnow(),
     )
-    embed.set_footer(text="Use /theme set <name> to apply a theme")
+    embed.set_footer(text="Use /theme set <name> to apply (moderation DMs + command responses)")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-@theme_group.command(name="set", description="Set the server's moderation theme")
+def _theme_has_moderation(name: str) -> bool:
+    """True if theme exists in theme_storage (moderation DMs)."""
+    safe = _sanitize_theme_name(name)
+    if not safe:
+        return False
+    preset_path = THEME_STORAGE_DIR / f"{safe}.json"
+    return preset_path.exists()
+
+
+def _theme_has_responses(name: str) -> bool:
+    """True if preset exists in response_themes (command responses)."""
+    return load_response_theme(name) is not None
+
+
+@theme_group.command(name="set", description="Set the server theme (moderation DMs + command responses)")
 @app_commands.describe(name="Theme name to apply")
 @app_commands.checks.has_permissions(manage_guild=True)
 async def theme_set(interaction: discord.Interaction, name: str) -> None:
@@ -473,11 +500,29 @@ async def theme_set(interaction: discord.Interaction, name: str) -> None:
     if not safe:
         await interaction.response.send_message("Invalid theme name. Use only letters, numbers, hyphens, and underscores.", ephemeral=True)
         return
-    if not load_theme(guild_id, safe):
+    has_mod = _theme_has_moderation(safe)
+    has_resp = _theme_has_responses(safe)
+    if not has_mod and not has_resp:
         await interaction.response.send_message(f"Theme `{safe}` not found. Use /theme list to see available themes.", ephemeral=True)
         return
-    set_guild_theme(guild_id, safe)
-    await interaction.response.send_message(f"Theme set to **{safe}**. Moderation DMs will use this theme.", ephemeral=True)
+
+    parts = []
+    if has_mod:
+        set_guild_theme(guild_id, safe)
+        parts.append("moderation DMs")
+
+    if has_resp:
+        data = load_response_theme(safe)
+        if data:
+            set_guild_command_responses(guild_id, data["overrides"])
+            parts.append("command responses")
+    else:
+        clear_guild_command_responses(guild_id)
+
+    msg = f"Theme set to **{safe}**."
+    if parts:
+        msg += f" Applied: {', '.join(parts)}."
+    await interaction.response.send_message(msg, ephemeral=True)
 
 
 @theme_group.command(name="preview", description="Preview a theme's moderation messages")
@@ -519,16 +564,19 @@ async def theme_info(interaction: discord.Interaction) -> None:
         return
     guild_id = interaction.guild.id
     config = _load_json(THEMES_CONFIG_PATH, {"guilds": {}})
-    theme_name = config.get("guilds", {}).get(str(guild_id), "default")
+    mod_theme = config.get("guilds", {}).get(str(guild_id), "default")
     theme = get_active_theme(guild_id)
     desc = theme.get("description", "No description.")
-    is_custom = theme_name in list_custom_themes(guild_id)
+    is_custom = mod_theme in list_custom_themes(guild_id)
+    overrides = get_guild_command_responses(guild_id)
+    resp_status = f"{len(overrides)} command(s)" if overrides else "None (default messages)"
     embed = discord.Embed(
         title="Theme Info",
         color=discord.Color.blurple(),
         timestamp=discord.utils.utcnow(),
     )
-    embed.add_field(name="Current Theme", value=theme_name, inline=True)
+    embed.add_field(name="Moderation DMs", value=mod_theme, inline=True)
+    embed.add_field(name="Command Responses", value=resp_status, inline=True)
     embed.add_field(name="Type", value="Custom" if is_custom else "Preset", inline=True)
     embed.add_field(name="Description", value=desc[:1024], inline=False)
     await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -645,7 +693,7 @@ async def theme_delete(interaction: discord.Interaction, name: str) -> None:
 responses_group = app_commands.Group(name="responses", description="Customize command response messages")
 
 
-@responses_group.command(name="presets", description="List available preset response themes")
+@responses_group.command(name="presets", description="List preset response themes (use /theme set to apply)")
 @app_commands.checks.has_permissions(manage_guild=True)
 async def responses_presets(interaction: discord.Interaction) -> None:
     if not await _guild_only(interaction):
@@ -668,40 +716,8 @@ async def responses_presets(interaction: discord.Interaction) -> None:
         color=discord.Color.blurple(),
         timestamp=discord.utils.utcnow(),
     )
-    embed.set_footer(text="Use /theme responses set <name> to apply a preset")
+    embed.set_footer(text="Use /theme set <name> to apply (moderation DMs + command responses)")
     await interaction.response.send_message(embed=embed, ephemeral=True)
-
-
-@responses_group.command(name="set", description="Apply a preset response theme to this server (supporters only)")
-@app_commands.describe(name="Preset theme name (use /theme responses presets to list)")
-@app_commands.checks.has_permissions(manage_guild=True)
-async def responses_set(interaction: discord.Interaction, name: str) -> None:
-    if not await _guild_only(interaction):
-        return
-    if not _supporter_active(interaction.user.id):
-        await interaction.response.send_message(
-            "Preset response themes require Ko-fi supporter status. Use /kofi link to get perks.",
-            ephemeral=True,
-        )
-        return
-    safe = _sanitize_theme_name(name)
-    if not safe:
-        await interaction.response.send_message("Invalid theme name.", ephemeral=True)
-        return
-    data = load_response_theme(safe)
-    if not data:
-        await interaction.response.send_message(
-            f"Preset `{safe}` not found. Use /theme responses presets to see available themes.",
-            ephemeral=True,
-        )
-        return
-    guild_id = interaction.guild.id
-    set_guild_command_responses(guild_id, data["overrides"])
-    display = data.get("name", safe)
-    await interaction.response.send_message(
-        f"Response theme set to **{display}**. All supported commands will use this theme.",
-        ephemeral=True,
-    )
 
 
 @responses_group.command(name="list", description="List configured command response overrides")

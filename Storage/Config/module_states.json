@@ -6,7 +6,6 @@
     "autorole": true,
     "calls": true,
     "fun": true,
-    "json_cache": true,
     "kofi": true,
     "leveling": true,
     "logging": true,

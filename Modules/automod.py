@@ -1846,11 +1846,21 @@ async def automod_warns(interaction: discord.Interaction, member: discord.Member
 async def automod_warn_add(interaction: discord.Interaction, member: discord.Member, reason: str):
     if not interaction.guild_id or not await _require_admin(interaction):
         return
+    if member.bot:
+        await interaction.response.send_message("Cannot warn a bot.", ephemeral=True)
+        return
     warn_count = add_warn(
         interaction.guild_id,
         member.id,
         reason,
         by=f"Manual ({interaction.user.display_name})",
+    )
+    await notify_user_automod_action(
+        member,
+        "warn",
+        f"{reason} (warning #{warn_count})",
+        interaction.guild.name,
+        rule="manual",
     )
     _dispatch_custom_event(
         "coffeecord_warn",
@@ -1862,7 +1872,15 @@ async def automod_warn_add(interaction: discord.Interaction, member: discord.Mem
     )
     guild_cfg = get_guild_config(interaction.guild_id)
     threshold_action = await apply_warn_threshold_action(member, warn_count, guild_cfg)
-    response = f"Added warn for {member.mention}. Total warns: **{warn_count}**."
+    from Modules.themes import get_command_response_for_interaction
+
+    response = get_command_response_for_interaction(
+        interaction,
+        "success",
+        "Added warn for {member}. Total warns: **{count}**.",
+        member=member.mention,
+        count=str(warn_count),
+    )
     if threshold_action:
         response += f"\nThreshold action: `{threshold_action}`"
     await interaction.response.send_message(response, ephemeral=True)

@@ -14,7 +14,7 @@ WELCOME_LEAVE_PATH = BASE_DIR / "Storage" / "Config" / "welcome_leave.json"
 LOGGING_PATH = BASE_DIR / "Storage" / "Config" / "logging.json"
 AUTOMOD_PATH = BASE_DIR / "Storage" / "Config" / "automod.json"
 REACTIONROLE_PATH = BASE_DIR / "Storage" / "Config" / "reactionrole_config.json"
-TICKETS_PATH = BASE_DIR / "Main" / "tickets.json"
+TICKETS_PATH = BASE_DIR / "Storage" / "Data" / "tickets.json"
 
 FEATURE_ORDER = ["welcome", "leave", "logging", "automod", "reaction_roles", "tickets"]
 FEATURE_LABELS = {

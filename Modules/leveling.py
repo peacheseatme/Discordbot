@@ -17,14 +17,14 @@ from .module_registry import is_module_enabled
 from .themes import get_command_response_for_interaction
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-XP_FILE = BASE_DIR / "Main" / "xp.json"
-CONFIG_FILE = BASE_DIR / "Main" / "leveling.json"
-BACKGROUND_FILE = BASE_DIR / "Main" / "backgrounds.json"
-LEVELCARD_STYLE_FILE = BASE_DIR / "Main" / "levelcard_styles.json"
-LEVEL_REWARDS_FILE = BASE_DIR / "Main" / "level_rewards.json"
+XP_FILE = BASE_DIR / "Storage" / "Data" / "xp.json"
+CONFIG_FILE = BASE_DIR / "Storage" / "Config" / "leveling.json"
+BACKGROUND_FILE = BASE_DIR / "Storage" / "Config" / "backgrounds.json"
+LEVELCARD_STYLE_FILE = BASE_DIR / "Storage" / "Data" / "levelcard_styles.json"
+LEVEL_REWARDS_FILE = BASE_DIR / "Storage" / "Config" / "level_rewards.json"
 SUPPORTERS_FILE = BASE_DIR / "Storage" / "Data" / "supporters.json"
-FONT_PATH = BASE_DIR / "Main" / "Roboto-Regular.ttf"
-BOLD_FONT_PATH = BASE_DIR / "Main" / "Roboto-Bold.ttf"
+FONT_PATH = BASE_DIR / "Storage" / "Assets" / "Roboto-Regular.ttf"
+BOLD_FONT_PATH = BASE_DIR / "Storage" / "Assets" / "Roboto-Bold.ttf"
 CACHE_DIR = BASE_DIR / "Storage" / "Temp" / "level_cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 

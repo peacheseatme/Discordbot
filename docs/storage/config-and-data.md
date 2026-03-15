@@ -78,9 +78,9 @@ def save_json(path: Path, data) -> None:
 | `Storage/Temp/level_cache/` | Level card image cache |
 | `Storage/Logs/` | Bot logs |
 
-## Legacy paths
+## Asset paths
 
-Some modules still use `Main/` for config (e.g. `Main/xp.json`, `Main/leveling.json`). New modules should prefer `Storage/Config/` and `Storage/Data/`.
+- `Storage/Assets/` — Fonts (e.g. `Roboto-Regular.ttf`, `Roboto-Bold.ttf` for level cards). If missing, the leveling module falls back to system fonts.
 
 ## Creating directories
 

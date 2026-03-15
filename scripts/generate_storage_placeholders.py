@@ -12,7 +12,6 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 STORAGE_CONFIG = PROJECT_ROOT / "Storage" / "Config"
 STORAGE_DATA = PROJECT_ROOT / "Storage" / "Data"
-MAIN_DIR = PROJECT_ROOT / "Main"
 
 # Config files with placeholder data
 CONFIG_PLACEHOLDERS: dict[str, object] = {
@@ -36,6 +35,7 @@ CONFIG_PLACEHOLDERS: dict[str, object] = {
     "command_config.json": {"guild_id": 0, "command_config": {}},
     "exit_surveys.json": {},
     "level_rewards.json": {},
+    "leveling.json": {},
     "leveling_announce.json": {},
     "leveling_config.json": {},
     "logging.json": {},
@@ -86,17 +86,9 @@ DATA_PLACEHOLDERS: dict[str, object] = {
     "tickets.json": {},
     "warns.json": {},
     "xp.json": {},
+    "levelcard_styles.json": {},
     "yaps.json": {"guilds": {}, "stats": {}},
     "staff_applications.json": {},
-}
-
-# Main/ files (leveling module uses these)
-MAIN_PLACEHOLDERS: dict[str, object] = {
-    "xp.json": {},
-    "leveling.json": {},
-    "backgrounds.json": {},
-    "levelcard_styles.json": {},
-    "level_rewards.json": {},
 }
 
 
@@ -119,10 +111,6 @@ def main() -> None:
         if _write_if_missing(STORAGE_DATA / name, data):
             created += 1
             print(f"  Created Storage/Data/{name}")
-    for name, data in MAIN_PLACEHOLDERS.items():
-        if _write_if_missing(MAIN_DIR / name, data):
-            created += 1
-            print(f"  Created Main/{name}")
     if created:
         print(f"Generated {created} placeholder file(s).")
     else:

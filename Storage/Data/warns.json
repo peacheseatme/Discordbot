@@ -65,43 +65,6 @@
         "by": "Automod"
       }
     ],
-    "1212790116838412341": [
-      {
-        "reason": "Use of blocked word: e",
-        "timestamp": 1771641326,
-        "by": "Automod"
-      },
-      {
-        "reason": "Use of blocked word: e",
-        "timestamp": 1771726249,
-        "by": "Automod"
-      },
-      {
-        "reason": "idk",
-        "timestamp": 1772304918,
-        "by": "Manual (Captain Viktor Vodkanov)"
-      },
-      {
-        "reason": "Message spam (rule violation)",
-        "timestamp": 1772825784,
-        "by": "Automod"
-      },
-      {
-        "reason": "Message spam (rule violation)",
-        "timestamp": 1772825785,
-        "by": "Automod"
-      },
-      {
-        "reason": "Message spam (rule violation)",
-        "timestamp": 1772825787,
-        "by": "Automod"
-      },
-      {
-        "reason": "e",
-        "timestamp": 1773594952,
-        "by": "Manual (Captain Viktor Vodkanov)"
-      }
-    ],
     "1390501770437984377": [
       {
         "reason": "idk",
@@ -111,6 +74,11 @@
       {
         "reason": "rude boi",
         "timestamp": 1773601884,
+        "by": "Manual (Captain Viktor Vodkanov)"
+      },
+      {
+        "reason": "e",
+        "timestamp": 1773608904,
         "by": "Manual (Captain Viktor Vodkanov)"
       }
     ]

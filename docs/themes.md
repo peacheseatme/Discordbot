@@ -1,18 +1,16 @@
 # Themes and Command Response Customization
 
-Themes let you customize moderation DM messages (ban, kick, timeout, warn) and command response text. **Supporters** (Ko-fi linked) can upload custom themes and command response overrides.
+Themes let you customize moderation DM messages (ban, kick, timeout, warn) and command response text. **One command** applies both: `/theme set <name>`.
 
-## Moderation Themes
-
-### Commands
+## Commands
 
 | Command | Description |
 |--------|-------------|
-| `/theme list` | List available themes (presets and custom) |
-| `/theme set <name>` | Set the server's moderation theme |
+| `/theme list` | List available themes (shows full, moderation-only, or responses-only) |
+| `/theme set <name>` | Set theme — applies moderation DMs and command responses in one go |
 | `/theme preview <name>` | Preview a theme's moderation messages |
-| `/theme info` | Show current theme and settings |
-| `/theme upload` | Upload a custom theme JSON (supporters only) |
+| `/theme info` | Show current theme (moderation + command responses) |
+| `/theme upload` | Upload a custom moderation theme JSON (supporters only) |
 | `/theme delete <name>` | Delete a custom theme (supporters only) |
 
 ### Preset Themes
@@ -65,16 +63,15 @@ Supporters can upload themes via `/theme upload`. Max 50KB, 3 custom themes per 
 
 ## Command Response Overrides
 
-Supporters can customize the text sent after **every slash command** (prefix commands like `.synccommands` cannot be overridden). Use `/theme responses upload` with a JSON file.
-
-### Commands
+Preset themes (e.g. `beavis_and_butthead`, `sassy`) include command responses — use `/theme set` to apply. For custom overrides, supporters can upload JSON via `/theme responses upload`.
 
 | Command | Description |
 |--------|-------------|
+| `/theme responses presets` | List preset response themes |
 | `/theme responses list` | List configured overrides for this server |
 | `/theme responses discover` | List all slash commands you can override |
 | `/theme responses keys` | List common keys and JSON format |
-| `/theme responses upload` | Upload overrides JSON (supporters only) |
+| `/theme responses upload` | Upload custom overrides JSON (supporters only) |
 | `/theme responses clear` | Clear all overrides (supporters only) |
 
 ### JSON Format

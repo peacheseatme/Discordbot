@@ -94,7 +94,15 @@ class FunCog(commands.Cog):
     async def bet(self, interaction: discord.Interaction, member: discord.Member, bet: str) -> None:
         if not await _check_fun_enabled(interaction):
             return
-        await interaction.response.send_message(f"{interaction.user.mention} has bet {member.mention} {bet}!")
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "{user} bet {amount} on {result}!",
+            user=interaction.user.mention,
+            amount=bet,
+            result=member.mention,
+        )
+        await interaction.response.send_message(msg)
 
     @app_commands.command(name="flipcoin", description="Flip a coin, optionally with a prize.")
     @app_commands.describe(prize="Prize to win")
@@ -103,9 +111,15 @@ class FunCog(commands.Cog):
             return
         result = random.choice(["Heads", "Tails"])
         if prize:
-            await interaction.response.send_message(
-                f"🪙 The coin landed on **{result}**! {interaction.user.mention} wins {prize}!"
+            msg = get_command_response_for_interaction(
+                interaction,
+                "success_with_prize",
+                "🪙 The coin landed on **{result}**! {user} wins {prize}!",
+                result=result,
+                user=interaction.user.mention,
+                prize=prize,
             )
+            await interaction.response.send_message(msg)
         else:
             msg = get_command_response_for_interaction(
                 interaction,
@@ -155,9 +169,16 @@ class FunCog(commands.Cog):
             return
         score = random.randint(0, 100)
         hearts = "❤️" * (score // 10)
-        await interaction.response.send_message(
-            f"💖 Love compatibility between {member1.mention} and {member2.mention} is {score}% {hearts}"
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "Love compatibility between {user1} and {user2}: **{percentage}%** {hearts}",
+            user1=member1.mention,
+            user2=member2.mention,
+            percentage=str(score),
+            hearts=hearts,
         )
+        await interaction.response.send_message(msg)
 
     @app_commands.command(name="truth", description="Ask someone a truth question.")
     @app_commands.describe(member="User to ask", question="Truth question")
@@ -169,7 +190,15 @@ class FunCog(commands.Cog):
     ) -> None:
         if not await _check_fun_enabled(interaction):
             return
-        await interaction.response.send_message(f"🧠 {member.mention}, **Truth:** {question}")
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "{user} asked {member} a truth question: **{question}**",
+            user=interaction.user.mention,
+            member=member.mention,
+            question=question,
+        )
+        await interaction.response.send_message(msg)
 
     @app_commands.command(name="dare", description="Give someone a dare challenge.")
     @app_commands.describe(member="User to dare", challenge="Dare challenge")
@@ -181,7 +210,15 @@ class FunCog(commands.Cog):
     ) -> None:
         if not await _check_fun_enabled(interaction):
             return
-        await interaction.response.send_message(f"🔥 {member.mention}, **Dare:** {challenge}")
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "{user} dared {member}: **{dare}**",
+            user=interaction.user.mention,
+            member=member.mention,
+            dare=challenge,
+        )
+        await interaction.response.send_message(msg)
 
     @app_commands.command(name="dog", description="Get a picture of a dog (optionally by breed)")
     @app_commands.describe(breed="Optional dog breed (e.g., pug, husky)")
@@ -196,7 +233,15 @@ class FunCog(commands.Cog):
             async with session.get(url) as resp:
                 data = await resp.json()
                 if data.get("status") == "success":
-                    await interaction.followup.send(data["message"])
+                    breed_text = f" ({breed})" if breed else ""
+                    msg = get_command_response_for_interaction(
+                        interaction,
+                        "success",
+                        "Here's a dog{breed}. {url}",
+                        breed=breed_text,
+                        url=data["message"],
+                    )
+                    await interaction.followup.send(msg)
                 else:
                     await interaction.followup.send("❌ Breed not found or error getting dog image.")
 
@@ -210,7 +255,13 @@ class FunCog(commands.Cog):
             async with session.get(url) as resp:
                 data = await resp.json()
                 if data:
-                    await interaction.followup.send(data[0]["url"])
+                    msg = get_command_response_for_interaction(
+                        interaction,
+                        "success",
+                        "Cat picture delivered. {url}",
+                        url=data[0]["url"],
+                    )
+                    await interaction.followup.send(msg)
                 else:
                     await interaction.followup.send("❌ Could not get a cat image.")
 
@@ -245,13 +296,25 @@ class FunCog(commands.Cog):
         petpet.make(buf_in, buf_out)
         buf_out.seek(0)
 
-        await interaction.followup.send(file=discord.File(buf_out, filename="petpet.gif"))
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "Petpet GIF created for {member}.",
+            member=member.mention,
+        )
+        await interaction.followup.send(msg, file=discord.File(buf_out, filename="petpet.gif"))
 
     @app_commands.command(name="ak47", description="Send a random AK-47 gif")
     async def ak47(self, interaction: discord.Interaction) -> None:
         if not await _check_fun_enabled(interaction):
             return
-        await interaction.response.send_message("https://giphy.com/gifs/cat-gun-thug-GaqnjVbSLs2uA")
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "AK-47 gif sent. {url}",
+            url="https://giphy.com/gifs/cat-gun-thug-GaqnjVbSLs2uA",
+        )
+        await interaction.response.send_message(msg)
 
     @app_commands.command(name="uwuify", description="Convert text to uwu-style")
     @app_commands.describe(text="Text to uwuify")
@@ -262,7 +325,13 @@ class FunCog(commands.Cog):
             from uwuify import uwu
 
             uwu_text = uwu(text)
-            await interaction.response.send_message(f"・: {uwu_text}")
+            msg = get_command_response_for_interaction(
+                interaction,
+                "success",
+                "Uwuified text: {text}",
+                text=uwu_text,
+            )
+            await interaction.response.send_message(msg)
         except ImportError:
             await interaction.response.send_message(
                 "❌ uwuify is not installed. Install with: pip install uwuify",
@@ -275,9 +344,15 @@ class FunCog(commands.Cog):
         if not await _check_fun_enabled(interaction):
             return
         url = "https://giphy.com/gifs/explosion-bomb-mushroom-X92pmIty2ZJp6"
-        await interaction.response.send_message(
-            f"{interaction.user.mention} gave a 🎁 to {member.mention}!\n{url}"
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "Surprise! 🎁 {user} gave a gift to {member}! {url}",
+            user=interaction.user.mention,
+            member=member.mention,
+            url=url,
         )
+        await interaction.response.send_message(msg)
 
     @app_commands.command(name="roast", description="Send a random roast")
     async def roast(self, interaction: discord.Interaction) -> None:
@@ -291,7 +366,14 @@ class FunCog(commands.Cog):
             "You have the perfect face for radio.",
             "You're like a cloud. When you disappear, it's a beautiful day.",
         ]
-        await interaction.response.send_message(random.choice(roasts))
+        roast = random.choice(roasts)
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "Roast: **{roast}**",
+            roast=roast,
+        )
+        await interaction.response.send_message(msg)
 
     @app_commands.command(
         name="abracadaberamotherafu",
@@ -301,9 +383,14 @@ class FunCog(commands.Cog):
         if not await _check_fun_enabled(interaction):
             return
         gif_url = "https://i.imgur.com/gXB0LAh.gif"
-        await interaction.response.send_message(
-            f"🪄 **ABRACADABERA MOTHERAFU—**\n{interaction.user.mention} just nuked a tank into the next dimension! 💥🚓🔥\n{gif_url}"
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "🪄 **ABRACADABERA MOTHERAFU—**\n{user} just nuked a tank into the next dimension! 💥🚓🔥\n{url}",
+            user=interaction.user.mention,
+            url=gif_url,
         )
+        await interaction.response.send_message(msg)
 
 
 async def setup(bot: commands.Bot) -> None:

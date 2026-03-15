@@ -266,8 +266,7 @@ async def _attempt_exit_survey(
             "6) Custom reason (write your own)\n\n"
             "Reply with a number or your own text. This request expires in 5 minutes."
         )
-        dm = await member.create_dm()
-        await dm.send(prompt)
+        await member.send(prompt)
     except discord.HTTPException:
         return
 
@@ -284,7 +283,7 @@ async def _attempt_exit_survey(
     reason = _normalize_survey_reason((reply.content or "").strip())
     if reason == "__custom__":
         try:
-            await dm.send("Please type your custom reason in one message.")
+            await member.send("Please type your custom reason in one message.")
             reply = await bot.wait_for("message", timeout=300, check=_check)
         except (asyncio.TimeoutError, discord.HTTPException):
             return
