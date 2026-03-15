@@ -413,21 +413,18 @@ async def notify_user_automod_action(
     rule: str | None = None,
     duration_seconds: int | None = None,
 ):
-    embed = discord.Embed(
-        title=f"Automod Notice: {action.title()}",
-        color=discord.Color.orange(),
-        timestamp=discord.utils.utcnow(),
+    from Modules.themes import send_themed_moderation_dm
+
+    guild_id = member.guild.id if member.guild else 0
+    await send_themed_moderation_dm(
+        member,
+        guild_id,
+        action,
+        guild_name,
+        reason=reason,
+        duration_seconds=duration_seconds,
+        rule=rule,
     )
-    embed.add_field(name="Server", value=guild_name, inline=False)
-    if rule:
-        embed.add_field(name="Rule", value=rule, inline=True)
-    if duration_seconds is not None:
-        embed.add_field(name="Duration", value=f"{int(duration_seconds)} second(s)", inline=True)
-    embed.add_field(name="Reason", value=str(reason)[:1024], inline=False)
-    try:
-        await member.send(embed=embed)
-    except (discord.Forbidden, discord.HTTPException):
-        pass
 
 
 async def log_message_action(

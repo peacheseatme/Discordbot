@@ -48,3 +48,5 @@ c-cord update     # Pull updates and restart
 ## License
 
 See repository for license details.
+
+Cursor and ChatGPt helped me bc I'm still learning to code :)

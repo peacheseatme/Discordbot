@@ -11,9 +11,11 @@ Documentation for the Coffeecord Discord bot: architecture, modules, commands, a
 | [commands/](commands/) | Slash commands, prefix commands, groups, and checks |
 | [architecture/](architecture/) | Bot loading, events, CLI, and integration patterns |
 | [storage/](storage/) | Config, data paths, and `json_cache` |
+| [themes.md](themes.md) | Moderation themes, custom themes, command response overrides |
 
 ## Quick Links
 
+- [Themes and command responses](themes.md) — Moderation themes, custom themes, response overrides
 - [Installation guide](installation/README.md) — Script, Linux, Windows
 - [Creating a new module](modules/creating-modules.md)
 - [How slash commands work](commands/slash-commands.md)

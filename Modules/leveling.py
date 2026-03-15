@@ -14,6 +14,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageSequence
 
 from .json_cache import get as _json_get, set_ as _json_set
 from .module_registry import is_module_enabled
+from .themes import get_command_response_for_interaction
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 XP_FILE = BASE_DIR / "Main" / "xp.json"
@@ -563,7 +564,13 @@ class LevelingCog(commands.Cog):
             channel_id=interaction.channel.id if interaction.channel else None,
         )
         preview = ", ".join(f"{k}={v}" for k, v in updates.items())
-        await interaction.response.send_message(f"✅ Level card updated: {preview}", ephemeral=True)
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "✅ Level card updated: {preview}",
+            preview=preview,
+        )
+        await interaction.response.send_message(msg, ephemeral=True)
 
     @levelcard_group.command(name="preset", description="Apply a predefined level card color theme.")
     @app_commands.describe(
@@ -784,7 +791,15 @@ class LevelingCog(commands.Cog):
             details=f"target={user.id}; xp={xp}; level={level}",
             channel_id=interaction.channel.id if interaction.channel else None,
         )
-        await interaction.response.send_message(f"✅ Set {user.display_name}'s XP to {xp} and Level to {level}.", ephemeral=True)
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "✅ Set {user}'s XP to {xp} and Level to {level}.",
+            user=user.display_name,
+            xp=str(xp),
+            level=str(level),
+        )
+        await interaction.response.send_message(msg, ephemeral=True)
 
     @xp_group.command(name="config", description="Configure XP gain and leveling settings for your server (Admin only)")
     @app_commands.describe(
@@ -890,7 +905,14 @@ class LevelingCog(commands.Cog):
             details=f"level={level}; role_id={role.id}",
             channel_id=interaction.channel.id if interaction.channel else None,
         )
-        await interaction.response.send_message(f"✅ Added reward for level **{level}** -> {role.mention}", ephemeral=True)
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "✅ Added reward for level **{level}** -> {role}",
+            level=str(level),
+            role=role.mention,
+        )
+        await interaction.response.send_message(msg, ephemeral=True)
 
     @levelreward_group.command(name="remove", description="Remove a level reward role.")
     @app_commands.checks.has_permissions(manage_roles=True)
@@ -920,7 +942,13 @@ class LevelingCog(commands.Cog):
             details=f"level={level}",
             channel_id=interaction.channel.id if interaction.channel else None,
         )
-        await interaction.response.send_message(f"🗑️ Removed reward for level **{level}**.", ephemeral=True)
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "🗑️ Removed reward for level **{level}**.",
+            level=str(level),
+        )
+        await interaction.response.send_message(msg, ephemeral=True)
 
     @levelreward_group.command(name="list", description="List all level reward roles.")
     async def levelreward_list(self, interaction: discord.Interaction) -> None:

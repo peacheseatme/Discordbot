@@ -74,6 +74,8 @@ CONFIG_PLACEHOLDERS: dict[str, object] = {
     "verify_config.json": {},
     "welcome_leave.json": {},
     "themes.json": {"guilds": {}},
+    "themes_config.json": {"guilds": {}},
+    "command_responses.json": {"guilds": {}},
     "adaptive_slowmode.json": {},
 }
 

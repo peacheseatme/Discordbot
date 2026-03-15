@@ -361,7 +361,13 @@ class WelcomeCog(
             ignore_enabled=True,
         )
         if ok:
-            await interaction.response.send_message("✅ Sent a welcome test message.", ephemeral=True)
+            from Modules.themes import get_command_response_for_interaction
+            msg = get_command_response_for_interaction(
+                interaction,
+                "success",
+                "✅ Sent a welcome test message.",
+            )
+            await interaction.response.send_message(msg, ephemeral=True)
         else:
             await interaction.response.send_message(
                 f"⚠️ Could not send welcome test message (`{reason}`). Check channel and bot permissions.",
@@ -455,7 +461,13 @@ class LeaveCog(
             ignore_enabled=True,
         )
         if ok:
-            await interaction.response.send_message("✅ Sent a leave test message.", ephemeral=True)
+            from Modules.themes import get_command_response_for_interaction
+            msg = get_command_response_for_interaction(
+                interaction,
+                "success",
+                "✅ Sent a leave test message.",
+            )
+            await interaction.response.send_message(msg, ephemeral=True)
         else:
             await interaction.response.send_message(
                 f"⚠️ Could not send leave test message (`{reason}`). Check channel and bot permissions.",

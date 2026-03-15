@@ -49,6 +49,7 @@ if _modules_path not in sys.path:
     sys.path.insert(0, _modules_path)
 
 from Modules import json_cache
+from Modules.themes import get_command_response, get_command_response_for_interaction
 
 def load_json(path: str, default: dict | list | None = None):
     """Load JSON from cache or disk."""
@@ -382,6 +383,13 @@ COMMAND_CATEGORIES = {
     ],
     "Setup Wizard": [
         "/setup", "/setup_resume", "/setup_cancel"
+    ],
+    "Themes": [
+        "/theme list", "/theme set", "/theme preview", "/theme info",
+        "/theme upload", "/theme delete",
+        "/theme responses presets", "/theme responses set",
+        "/theme responses list", "/theme responses upload", "/theme responses keys",
+        "/theme responses discover", "/theme responses clear",
     ],
     "Misc": [
         "/verifyconfig", "/autorole status", "/autorole toggle", "/autorole add",
@@ -1305,13 +1313,31 @@ class LoggingConfigView(discord.ui.View):
 
 from typing import Optional
 
+def _get_themes_module():
+    import importlib
+    return importlib.import_module("Modules.themes")
+
+
 async def _notify_user_moderation_dm(
     member: discord.Member,
     action: str,
     guild_name: str,
+    guild_id: int = 0,
     reason: str | None = None,
     duration_text: str | None = None,
 ):
+    action_lower = action.lower()
+    if action_lower in ("ban", "kick", "timeout", "warn"):
+        themes_mod = _get_themes_module()
+        await themes_mod.send_themed_moderation_dm(
+            member,
+            guild_id,
+            action_lower,
+            guild_name,
+            reason=reason,
+            duration_text=duration_text,
+        )
+        return
     embed = discord.Embed(
         title=f"Moderation Notice: {action}",
         color=discord.Color.orange(),
@@ -1353,14 +1379,21 @@ async def ban(
             member,
             "Ban",
             interaction.guild.name if interaction.guild else "Unknown Server",
+            guild_id=interaction.guild.id if interaction.guild else 0,
             reason=reason,
             duration_text=(f"{duration} minute(s)" if duration else "Permanent"),
         )
         await member.ban(reason=reason)
         if duration:
-            await interaction.response.send_message(
-                f"🔨 {member} has been banned for {duration} minutes. Reason: {reason or 'No reason provided'}"
+            msg = get_command_response_for_interaction(
+                interaction,
+                "success",
+                "🔨 {member} has been banned for {duration} minutes. Reason: {reason}",
+                member=str(member),
+                duration=str(duration),
+                reason=reason or "No reason provided",
             )
+            await interaction.response.send_message(msg)
             _dispatch_module_log_event(
                 interaction.guild,
                 "moderation",
@@ -1373,9 +1406,14 @@ async def ban(
             await asyncio.sleep(duration * 60)
             await interaction.guild.unban(member)
         else:
-            await interaction.response.send_message(
-                f"🔨 {member} has been permanently banned. Reason: {reason or 'No reason provided'}"
+            msg = get_command_response_for_interaction(
+                interaction,
+                "success_permanent",
+                "🔨 {member} has been permanently banned. Reason: {reason}",
+                member=str(member),
+                reason=reason or "No reason provided",
             )
+            await interaction.response.send_message(msg)
             _dispatch_module_log_event(
                 interaction.guild,
                 "moderation",
@@ -1412,7 +1450,13 @@ async def unban(interaction: discord.Interaction, user_id: str):
             return await interaction.response.send_message(f"❌ No banned user with ID `{user_id}` found.", ephemeral=True)
 
         await guild.unban(ban_entry.user, reason=f"Unbanned by {interaction.user}")
-        await interaction.response.send_message(f"✅ Successfully unbanned {ban_entry.user}.")
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "✅ Successfully unbanned {user}.",
+            user=str(ban_entry.user),
+        )
+        await interaction.response.send_message(msg)
         _dispatch_module_log_event(
             interaction.guild,
             "moderation",
@@ -1437,8 +1481,14 @@ async def giverole(interaction: discord.Interaction, member: discord.Member, rol
 
     try:
         await member.add_roles(role)
-        await interaction.response.send_message(
-            f"✅ Added role {role.name} to {member.mention}.")
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "✅ Added role {role} to {member}.",
+            role=role.name,
+            member=member.mention,
+        )
+        await interaction.response.send_message(msg)
         _dispatch_module_log_event(
             interaction.guild,
             "moderation",
@@ -1465,8 +1515,14 @@ async def removerole(interaction: discord.Interaction, member: discord.Member, r
 
     try:
         await member.remove_roles(role)
-        await interaction.response.send_message(
-            f"✅ Removed role {role.name} from {member.mention}.")
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "✅ Removed role {role} from {member}.",
+            role=role.name,
+            member=member.mention,
+        )
+        await interaction.response.send_message(msg)
         _dispatch_module_log_event(
             interaction.guild,
             "moderation",
@@ -1671,10 +1727,20 @@ async def mute(interaction: discord.Interaction, member: discord.Member, duratio
         member,
         "Mute",
         interaction.guild.name if interaction.guild else "Unknown Server",
+        guild_id=interaction.guild.id if interaction.guild else 0,
         reason=reason,
         duration_text=f"{duration}{unit}",
     )
-    await interaction.response.send_message(f"🔇 {member.mention} has been muted for {duration}{unit}. Reason: {reason or 'No reason provided'}")
+    msg = get_command_response_for_interaction(
+        interaction,
+        "success",
+        "🔇 {member} has been muted for {duration}{unit}. Reason: {reason}",
+        member=member.mention,
+        duration=str(duration),
+        unit=unit,
+        reason=reason or "No reason provided",
+    )
+    await interaction.response.send_message(msg)
     _dispatch_module_log_event(
         interaction.guild,
         "moderation",
@@ -1690,6 +1756,7 @@ async def mute(interaction: discord.Interaction, member: discord.Member, duratio
         member,
         "Unmute",
         interaction.guild.name if interaction.guild else "Unknown Server",
+        guild_id=interaction.guild.id if interaction.guild else 0,
         reason="Mute duration expired",
     )
 
@@ -1711,9 +1778,16 @@ async def unmute(interaction: discord.Interaction, member: discord.Member):
             member,
             "Unmute",
             interaction.guild.name if interaction.guild else "Unknown Server",
+            guild_id=interaction.guild.id if interaction.guild else 0,
             reason="Manual unmute by staff",
         )
-        await interaction.response.send_message(f"🔊 {member.mention} has been unmuted.")
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "🔊 {member} has been unmuted.",
+            member=member.mention,
+        )
+        await interaction.response.send_message(msg)
         _dispatch_module_log_event(
             interaction.guild,
             "moderation",
@@ -1743,7 +1817,13 @@ async def muterole_create(interaction: discord.Interaction):
 
     mute_config[str(guild.id)] = role.id
     save_mute_config(mute_config)
-    await interaction.followup.send(f"✅ Created and set mute role: `{role.name}`", ephemeral=True)
+    msg = get_command_response_for_interaction(
+        interaction,
+        "success",
+        "✅ Created and set mute role: `{role}`",
+        role=role.name,
+    )
+    await interaction.followup.send(msg, ephemeral=True)
     _dispatch_module_log_event(
         interaction.guild,
         "moderation",
@@ -1760,7 +1840,13 @@ async def muterole_create(interaction: discord.Interaction):
 async def muterole_update(interaction: discord.Interaction, role: discord.Role):
     mute_config[str(interaction.guild_id)] = role.id
     save_mute_config(mute_config)
-    await interaction.response.send_message(f"🔄 Mute role updated to `{role.name}`", ephemeral=True)
+    msg = get_command_response_for_interaction(
+        interaction,
+        "success",
+        "🔄 Mute role updated to `{role}`",
+        role=role.name,
+    )
+    await interaction.response.send_message(msg, ephemeral=True)
     _dispatch_module_log_event(
         interaction.guild,
         "moderation",
@@ -1794,9 +1880,17 @@ async def hardmute(interaction: discord.Interaction, member: discord.Member, rea
             member,
             "Hardmute",
             interaction.guild.name if interaction.guild else "Unknown Server",
+            guild_id=interaction.guild.id if interaction.guild else 0,
             reason=reason,
         )
-        await interaction.response.send_message(f"🔇 {member.mention} has been hardmuted. Reason: {reason}")
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "🔇 {member} has been hardmuted. Reason: {reason}",
+            member=member.mention,
+            reason=reason,
+        )
+        await interaction.response.send_message(msg)
         _dispatch_module_log_event(
             interaction.guild,
             "moderation",
@@ -2706,32 +2800,9 @@ async def application(interaction: discord.Interaction):
 
 import aiohttp
 
-LEAVE_MSG = (
-    "❌ Coffeecord can’t operate in servers that contain NSFW channels. "
-    "The bot will now leave. Have a nice day!"
-)
-
-def guild_has_nsfw(guild: discord.Guild) -> bool:
-    """Return True if *any* text channel is marked NSFW."""
-    return any(
-        isinstance(c, discord.TextChannel) and c.is_nsfw()
-        for c in guild.channels
-    )
-
 @bot.event
 async def on_guild_join(guild: discord.Guild):
     """Triggered when the bot joins a guild."""
-
-    # --- NSFW SERVER CHECK ----
-    if guild_has_nsfw(guild):
-        try:
-            if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
-                await guild.system_channel.send(LEAVE_MSG)
-        except Exception:
-            pass
-        await guild.leave()
-        print(f"[NSFW-LEAVE] Left guild {guild.name} ({guild.id}) due to NSFW channels")
-        return
 
     # --- WELCOME BUTTONS CLASS ---
     class WelcomeButtons(discord.ui.View):
@@ -2790,26 +2861,6 @@ async def on_guild_join(guild: discord.Guild):
     except Exception as e:
         print(f"[JOIN ERROR] Failed to send welcome in {guild.name}: {e}")
 
-# ── OPTIONAL: leave later if someone *adds* an NSFW channel ─────
-@bot.event
-async def on_guild_channel_update(before: discord.abc.GuildChannel,
-                                  after : discord.abc.GuildChannel):
-    # We only care about text‑channel NSFW flag flips while we’re still inside
-    if (
-        isinstance(after, discord.TextChannel)
-        and not before.is_nsfw()
-        and     after.is_nsfw()
-    ):
-        guild = after.guild
-        try:
-            if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
-                await guild.system_channel.send(LEAVE_MSG)
-        except Exception:
-            pass
-        await guild.leave()
-        print(f"[NSFW‑LEAVE] Left guild {guild.name} ({guild.id}) "
-              f"because channel #{after.name} was set to NSFW")
-        "You’re not lazy, you’re just in energy-saving mode... permanently."
 # leveling reward and level-up logic extracted to Modules/leveling.py
 
 from discord.ui import Modal, TextInput, View, Select

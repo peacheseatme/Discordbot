@@ -37,15 +37,6 @@
       "category": "configuration"
     },
     {
-      "id": "fun",
-      "extension": "Modules.fun",
-      "path": "Modules/fun.py",
-      "display_name": "Fun Commands",
-      "description": "8ball, flipcoin, hug, kiss, dog, cat, roast, and other fun commands.",
-      "default_enabled": true,
-      "category": "engagement"
-    },
-    {
       "id": "calls",
       "extension": "Modules.calls",
       "path": "Modules/calls.py",
@@ -53,6 +44,15 @@
       "description": "Private call channels and call membership management.",
       "default_enabled": true,
       "category": "utilities"
+    },
+    {
+      "id": "fun",
+      "extension": "Modules.fun",
+      "path": "Modules/fun.py",
+      "display_name": "Fun Commands",
+      "description": "8ball, flipcoin, hug, kiss, dog, cat, roast, and other fun commands.",
+      "default_enabled": true,
+      "category": "engagement"
     },
     {
       "id": "kofi",
@@ -152,6 +152,15 @@
       "description": "Simple test module for verifying module refresh_registry works.",
       "default_enabled": true,
       "category": "utilities"
+    },
+    {
+      "id": "themes",
+      "extension": "Modules.themes",
+      "path": "Modules/themes.py",
+      "display_name": "Themes",
+      "description": "Customize moderation DM messages with preset or custom themes.",
+      "default_enabled": true,
+      "category": "configuration"
     },
     {
       "id": "tickets",

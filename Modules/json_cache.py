@@ -28,7 +28,7 @@ def get(path: str | Path, default: Any = None) -> Any:
     """Load JSON from cache or disk. Returns cached copy on hit."""
     key = _path_key(path)
     if key in _CACHE:
-        return _CACHE[key]
+        return _copy_if_mutable(_CACHE[key])
     p = Path(path)
     if not p.exists():
         base = default if default is not None else {}
@@ -37,7 +37,7 @@ def get(path: str | Path, default: Any = None) -> Any:
         with p.open("r", encoding="utf-8") as fp:
             data = json.load(fp)
         _CACHE[key] = data
-        return data
+        return _copy_if_mutable(data)
     except (OSError, json.JSONDecodeError):
         base = default if default is not None else {}
         return _copy_if_mutable(base)

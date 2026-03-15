@@ -14,6 +14,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from .module_registry import is_module_enabled
+from .themes import get_command_response_for_interaction
 
 __module_display_name__ = "Fun Commands"
 __module_description__ = "8ball, flipcoin, hug, kiss, dog, cat, roast, and other fun commands."
@@ -79,7 +80,14 @@ class FunCog(commands.Cog):
             "Very doubtful.",
         ]
         answer = random.choice(responses)
-        await interaction.response.send_message(f"🎱 **Question:** {question}\n**Answer:** {answer}")
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "🎱 **Question:** {question}\n**Answer:** {answer}",
+            question=question,
+            answer=answer,
+        )
+        await interaction.response.send_message(msg)
 
     @app_commands.command(name="bet", description="Place a bet with another user.")
     @app_commands.describe(member="User to bet with", bet="What you want to bet")
@@ -99,21 +107,41 @@ class FunCog(commands.Cog):
                 f"🪙 The coin landed on **{result}**! {interaction.user.mention} wins {prize}!"
             )
         else:
-            await interaction.response.send_message(f"🪙 The coin landed on **{result}**!")
+            msg = get_command_response_for_interaction(
+                interaction,
+                "success",
+                "🪙 The coin landed on **{result}**!",
+                result=result,
+            )
+            await interaction.response.send_message(msg)
 
     @app_commands.command(name="hug", description="Give someone a hug.")
     @app_commands.describe(member="User to hug")
     async def hug(self, interaction: discord.Interaction, member: discord.Member) -> None:
         if not await _check_fun_enabled(interaction):
             return
-        await interaction.response.send_message(f"🤗 {interaction.user.mention} gives {member.mention} a big hug!")
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "🤗 {user} gives {member} a big hug!",
+            user=interaction.user.mention,
+            member=member.mention,
+        )
+        await interaction.response.send_message(msg)
 
     @app_commands.command(name="kiss", description="Kiss someone.")
     @app_commands.describe(member="User to kiss")
     async def kiss(self, interaction: discord.Interaction, member: discord.Member) -> None:
         if not await _check_fun_enabled(interaction):
             return
-        await interaction.response.send_message(f"{interaction.user.mention} kissed {member.mention}!")
+        msg = get_command_response_for_interaction(
+            interaction,
+            "success",
+            "{user} kissed {member}!",
+            user=interaction.user.mention,
+            member=member.mention,
+        )
+        await interaction.response.send_message(msg)
 
     @app_commands.command(name="lovecalc", description="Calculate love compatibility between two users.")
     @app_commands.describe(member1="First user", member2="Second user")

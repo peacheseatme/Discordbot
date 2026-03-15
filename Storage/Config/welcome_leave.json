@@ -30,5 +30,37 @@
       "exit_survey_enabled": true,
       "exit_survey_log_channel_id": 1477812981470466090
     }
+  },
+  "333949691962195969": {
+    "welcome": {
+      "enabled": false,
+      "channel_id": null,
+      "message": "Welcome {user_mention} to {server_name}! We now have {member_count} members.",
+      "embed_enabled": false
+    },
+    "leave": {
+      "enabled": false,
+      "channel_id": null,
+      "message": "Goodbye {user_name}. We're sad to see you go!",
+      "embed_enabled": false,
+      "exit_survey_enabled": false,
+      "exit_survey_log_channel_id": null
+    }
+  },
+  "1190489702269206671": {
+    "welcome": {
+      "enabled": false,
+      "channel_id": null,
+      "message": "Welcome {user_mention} to {server_name}! We now have {member_count} members.",
+      "embed_enabled": false
+    },
+    "leave": {
+      "enabled": false,
+      "channel_id": null,
+      "message": "Goodbye {user_name}. We're sad to see you go!",
+      "embed_enabled": false,
+      "exit_survey_enabled": false,
+      "exit_survey_log_channel_id": null
+    }
   }
 }

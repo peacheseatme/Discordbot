@@ -20,6 +20,7 @@ else:
     )
 
 from Modules import json_cache
+from Modules.themes import get_command_response, get_command_response_for_interaction
 
 _TICKETS_BASE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Storage")
 TICKETS_FILE = os.path.join(_TICKETS_BASE, "Data", "tickets.json")
@@ -140,7 +141,12 @@ async def ticket_setup(
         channel.id,
         f"Support roles: {len(roles)} | Types: {', '.join(ticket_types)}",
     )
-    await interaction.response.send_message("✅ Ticket system set up!", ephemeral=True)
+    msg = get_command_response_for_interaction(
+        interaction,
+        "success",
+        "✅ Ticket system set up!",
+    )
+    await interaction.response.send_message(msg, ephemeral=True)
 
 
 # ---------- TICKET PANEL ----------
@@ -242,7 +248,14 @@ async def create_ticket(interaction: Interaction, ticket_type: str, guild_id: st
             channel.id,
             f"type={ticket_type}",
         )
-        await interaction.followup.send(f"✅ Ticket created: {channel.mention}", ephemeral=True)
+        msg = get_command_response(
+            guild.id,
+            "ticket_create",
+            "success",
+            "✅ Ticket created: {channel}",
+            channel=channel.mention,
+        )
+        await interaction.followup.send(msg, ephemeral=True)
     except discord.Forbidden:
         await interaction.followup.send("❌ I don't have permission to create channels.", ephemeral=True)
     except Exception as e:

@@ -95,12 +95,22 @@
         "reason": "Message spam (rule violation)",
         "timestamp": 1772825787,
         "by": "Automod"
+      },
+      {
+        "reason": "e",
+        "timestamp": 1773594952,
+        "by": "Manual (Captain Viktor Vodkanov)"
       }
     ],
     "1390501770437984377": [
       {
         "reason": "idk",
         "timestamp": 1772489520,
+        "by": "Manual (Captain Viktor Vodkanov)"
+      },
+      {
+        "reason": "rude boi",
+        "timestamp": 1773601884,
         "by": "Manual (Captain Viktor Vodkanov)"
       }
     ]
