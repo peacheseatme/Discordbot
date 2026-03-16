@@ -2238,8 +2238,8 @@ async def say(interaction: discord.Interaction):
     await interaction.response.send_message("Select a channel to send a message:", view=SayView(interaction.guild), ephemeral=True)
 
 
-@tree.command(name="dm", description="Send a DM as the bot (requires Manage Members)")
-@app_commands.checks.has_permissions(manage_members=True)
+@tree.command(name="dm", description="Send a DM as the bot (requires Moderate Members)")
+@app_commands.checks.has_permissions(moderate_members=True)
 async def dm(interaction: discord.Interaction):
     await interaction.response.send_message("Select a user to DM:", view=DmView(interaction.guild), ephemeral=True)
 
