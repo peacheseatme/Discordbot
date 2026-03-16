@@ -48,6 +48,7 @@ if _discordbot_root not in sys.path:
 if _modules_path not in sys.path:
     sys.path.insert(0, _modules_path)
 
+from Modules import anti_abuse
 from Modules import json_cache
 from Modules.themes import get_command_response, get_command_response_for_interaction
 
@@ -60,9 +61,28 @@ def save_json(path: str, data) -> None:
     json_cache.set_(path, data)
 
 STAFF_APP_FILE = os.path.join(_storage_dir, "Data", "staff_applications.json")
+DM_OPTOUT_FILE = os.path.join(_storage_dir, "Data", "dm_optout.json")
 
 # In‑memory cache of the staff‑application config for *all* guilds
 staff_app_cfg: dict[str, dict] = load_json(STAFF_APP_FILE, {})
+
+
+def _dm_optout_ids() -> set:
+    """Load set of user IDs who opted out of receiving staff DMs."""
+    data = load_json(DM_OPTOUT_FILE, {"user_ids": []})
+    return set(str(x) for x in data.get("user_ids", []))
+
+
+def _dm_optout_add(user_id: int) -> None:
+    ids = _dm_optout_ids()
+    ids.add(str(user_id))
+    save_json(DM_OPTOUT_FILE, {"user_ids": list(ids)})
+
+
+def _dm_optout_remove(user_id: int) -> None:
+    ids = _dm_optout_ids()
+    ids.discard(str(user_id))
+    save_json(DM_OPTOUT_FILE, {"user_ids": list(ids)})
 # ─────────────────────────────────────────────────────────
 
 intents = discord.Intents.default()
@@ -75,6 +95,13 @@ intents.presences = ENABLE_PRESENCE_INTENT
 bot = commands.Bot(command_prefix=".", intents=intents)
 
 tree = bot.tree
+anti_abuse.register_dev_group(bot)
+
+
+@tree.interaction_check
+async def _global_anti_abuse_check(interaction: discord.Interaction) -> bool:
+    """Global slash-command anti-abuse gate."""
+    return await anti_abuse.should_allow_interaction(interaction)
 
 OWNER_ID = 0  # Replace with your Discord user ID
 
@@ -334,7 +361,8 @@ class Theme:
 
 COMMAND_CATEGORIES = {
     "General": [
-        "/help", "/support us", "/say", "/dm", "/poll", "/nickname"
+        "/help", "/support us", "/say", "/dm", "/poll", "/nickname",
+        "/optout", "/optin"
     ],
     "Ko-fi": [
         "/kofi link", "/kofi status", "/kofi claim", "/kofi add", "/kofi remove"
@@ -2031,37 +2059,90 @@ class SayView(discord.ui.View):
         await interaction.response.send_message("✅ Message sent!", ephemeral=True)
 
 
-class DmView(discord.ui.View):
-    def __init__(self, guild):
-        super().__init__(timeout=None)
+DM_OPTOUT_FOOTER = "\n\n_Use `/optout` in any server with this bot to stop receiving these messages._"
+
+
+class DmModal(discord.ui.Modal, title="Type your DM"):
+    def __init__(self, selected_user: discord.Member, guild: discord.Guild, staff_user: discord.User, anonymous: bool):
+        super().__init__()
+        self.selected_user = selected_user
         self.guild = guild
-        self.member_select = discord.ui.Select(
-            placeholder="Choose a user to DM",
-            options=[
-                discord.SelectOption(label=member.display_name, value=str(member.id))
-                for member in guild.members if not member.bot
-            ][:25]  # Limit to 25 users
-        )
+        self.staff_user = staff_user
+        self.anonymous = anonymous
+        self.msg_input = discord.ui.TextInput(label="Message", style=discord.TextStyle.paragraph, required=True)
+        self.add_item(self.msg_input)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        if str(self.selected_user.id) in _dm_optout_ids():
+            await interaction.response.send_message(
+                f"❌ {self.selected_user.display_name} has opted out of receiving staff DMs.",
+                ephemeral=True,
+            )
+            return
+        if self.anonymous:
+            header = f"📬 **Anonymous message sent by a user in {self.guild.name}:**"
+        else:
+            header = f"📬 **Message sent by {self.staff_user} in {self.guild.name}:**"
+        body = f"{header}\n{self.msg_input.value}{DM_OPTOUT_FOOTER}"
+        try:
+            await self.selected_user.send(body)
+            await interaction.response.send_message("✅ Message sent!", ephemeral=True)
+            if "log_action" in globals():
+                author_label = "anonymous" if self.anonymous else str(self.staff_user)
+                await log_action(
+                    interaction,
+                    f"📨 **DM sent** to {self.selected_user.mention} by {author_label} - Content: {self.msg_input.value}",
+                )
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                f"❌ Cannot DM {self.selected_user.display_name} (DMs disabled or blocked).",
+                ephemeral=True,
+            )
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
+
+
+class DmAuthorChoiceView(discord.ui.View):
+    def __init__(self, selected_user: discord.Member, guild: discord.Guild, staff_user: discord.User):
+        super().__init__(timeout=60)
+        self.selected_user = selected_user
+        self.guild = guild
+        self.staff_user = staff_user
+
+    @discord.ui.button(label="Send as myself", style=discord.ButtonStyle.primary)
+    async def as_myself(self, interaction: discord.Interaction, _button: discord.ui.Button):
+        modal = DmModal(self.selected_user, self.guild, self.staff_user, anonymous=False)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Send anonymously", style=discord.ButtonStyle.secondary)
+    async def as_anonymous(self, interaction: discord.Interaction, _button: discord.ui.Button):
+        modal = DmModal(self.selected_user, self.guild, self.staff_user, anonymous=True)
+        await interaction.response.send_modal(modal)
+
+
+class DmView(discord.ui.View):
+    def __init__(self, guild: discord.Guild):
+        super().__init__(timeout=60)
+        self.guild = guild
+        options = [
+            discord.SelectOption(label=member.display_name, value=str(member.id))
+            for member in guild.members
+            if not member.bot
+        ][:25]
+        self.member_select = discord.ui.Select(placeholder="Choose a user to DM", options=options)
         self.member_select.callback = self.select_member
         self.add_item(self.member_select)
 
-        self.message_input = discord.ui.TextInput(label="Message", style=discord.TextStyle.paragraph)
-        self.modal = discord.ui.Modal(title="Type your DM")
-        self.modal.add_item(self.message_input)
-        self.modal.on_submit = self.send_dm
-
-    async def select_member(self, interaction: discord.Interaction):
-        self.selected_user = self.guild.get_member(int(self.member_select.values[0]))
-        await interaction.response.send_modal(self.modal)
-
-    async def send_dm(self, interaction: discord.Interaction):
-        try:
-            await self.selected_user.send(f"📬 **Message from staff:**\n{self.message_input.value}")
-            await interaction.response.send_message("✅ Message sent!", ephemeral=True)
-            if 'log_action' in globals():
-                await log_action(interaction, f"📨 **DM sent** to {self.selected_user.mention} by {interaction.user.mention} - Content: {self.message_input.value}")
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Error: {e}", ephemeral=True)
+    async def select_member(self, interaction: discord.Interaction) -> None:
+        selected_user = self.guild.get_member(int(self.member_select.values[0]))
+        if not selected_user:
+            await interaction.response.send_message("❌ User not found.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            f"Send to {selected_user.mention} as:",
+            view=DmAuthorChoiceView(selected_user, self.guild, interaction.user),
+            ephemeral=True,
+        )
 
 from discord.ui import Button, View
 from discord import Interaction
@@ -2157,10 +2238,28 @@ async def say(interaction: discord.Interaction):
     await interaction.response.send_message("Select a channel to send a message:", view=SayView(interaction.guild), ephemeral=True)
 
 
-@tree.command(name="dm", description="Send a DM as the bot")
-@app_commands.checks.has_permissions(manage_guild=True)
+@tree.command(name="dm", description="Send a DM as the bot (requires Manage Members)")
+@app_commands.checks.has_permissions(manage_members=True)
 async def dm(interaction: discord.Interaction):
     await interaction.response.send_message("Select a user to DM:", view=DmView(interaction.guild), ephemeral=True)
+
+
+@tree.command(name="optout", description="Opt out of receiving staff DMs from this bot")
+async def optout(interaction: discord.Interaction) -> None:
+    _dm_optout_add(interaction.user.id)
+    await interaction.response.send_message(
+        "✅ You have opted out of receiving staff DMs. Use `/optin` to opt back in.",
+        ephemeral=True,
+    )
+
+
+@tree.command(name="optin", description="Opt back in to receiving staff DMs from this bot")
+async def optin(interaction: discord.Interaction) -> None:
+    _dm_optout_remove(interaction.user.id)
+    await interaction.response.send_message(
+        "✅ You have opted back in to receiving staff DMs.",
+        ephemeral=True,
+    )
 
 
 @tree.command(name="poll", description="Create a poll")

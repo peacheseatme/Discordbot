@@ -33,6 +33,22 @@
   },
   "333949691962195969": {
     "welcome": {
+      "enabled": true,
+      "channel_id": 820694631066632202,
+      "message": "test",
+      "embed_enabled": false
+    },
+    "leave": {
+      "enabled": true,
+      "channel_id": 820694631066632202,
+      "message": "eee",
+      "embed_enabled": false,
+      "exit_survey_enabled": false,
+      "exit_survey_log_channel_id": null
+    }
+  },
+  "1190489702269206671": {
+    "welcome": {
       "enabled": false,
       "channel_id": null,
       "message": "Welcome {user_mention} to {server_name}! We now have {member_count} members.",
@@ -47,7 +63,7 @@
       "exit_survey_log_channel_id": null
     }
   },
-  "1190489702269206671": {
+  "1483130680853401822": {
     "welcome": {
       "enabled": false,
       "channel_id": null,

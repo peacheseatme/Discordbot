@@ -12,6 +12,7 @@ from discord import app_commands
 from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFont, ImageSequence
 
+from . import anti_abuse
 from .json_cache import get as _json_get, set_ as _json_set
 from .module_registry import is_module_enabled
 from .themes import get_command_response_for_interaction
@@ -647,6 +648,7 @@ class LevelingCog(commands.Cog):
         )
 
     @app_commands.command(name="level", description="Show your or another user's level card.")
+    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)
     async def level(self, interaction: discord.Interaction, user: Optional[discord.Member] = None) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
@@ -705,63 +707,64 @@ class LevelingCog(commands.Cog):
         cached_path = CACHE_DIR / f"card_{cache_key}{cache_suffix}"
 
         await interaction.response.defer()
-        now_ts = time.time()
-        _prune_levelcard_cache(now_ts)
-        if cached_path.exists():
+        async with anti_abuse.heavy_task_slot():
+            now_ts = time.time()
+            _prune_levelcard_cache(now_ts)
+            if cached_path.exists():
+                try:
+                    cache_age = now_ts - cached_path.stat().st_mtime
+                    if cache_age <= LEVELCARD_CACHE_TTL_SECONDS:
+                        await interaction.followup.send(file=discord.File(str(cached_path)))
+                        return
+                except OSError:
+                    pass
+
+            session = getattr(self.bot, "http_session", None)
+            if session is None:
+                session = aiohttp.ClientSession()
+                close_session = True
+            else:
+                close_session = False
             try:
-                cache_age = now_ts - cached_path.stat().st_mtime
-                if cache_age <= LEVELCARD_CACHE_TTL_SECONDS:
-                    await interaction.followup.send(file=discord.File(str(cached_path)))
-                    return
-            except OSError:
+                async with session.get(bg_url) as resp:
+                        if resp.status != 200:
+                            await interaction.followup.send("❌ Failed to download background.", ephemeral=True)
+                            return
+                        bg_bytes = await resp.read()
+            except Exception as e:
+                await interaction.followup.send(f"❌ Error loading background: {e}", ephemeral=True)
+                return
+            finally:
+                if close_session:
+                    await session.close()
+
+            avatar_bytes = None
+            try:
+                avatar_bytes = await target.display_avatar.replace(size=128).read()
+            except Exception:
                 pass
 
-        session = getattr(self.bot, "http_session", None)
-        if session is None:
-            session = aiohttp.ClientSession()
-            close_session = True
-        else:
-            close_session = False
-        try:
-            async with session.get(bg_url) as resp:
-                    if resp.status != 200:
-                        await interaction.followup.send("❌ Failed to download background.", ephemeral=True)
-                        return
-                    bg_bytes = await resp.read()
-        except Exception as e:
-            await interaction.followup.send(f"❌ Error loading background: {e}", ephemeral=True)
-            return
-        finally:
-            if close_session:
-                await session.close()
-
-        avatar_bytes = None
-        try:
-            avatar_bytes = await target.display_avatar.replace(size=128).read()
-        except Exception:
-            pass
-
-        try:
-            await asyncio.to_thread(
-                _render_levelcard_sync,
-                bg_bytes,
-                bg_url.lower().endswith(".gif") and supporter,
-                avatar_bytes,
-                style_colors,
-                progress,
-                str(target.display_name),
-                level,
-                rank,
-                xp,
-                xp_for_next_level,
-                status_color,
-                cached_path,
-                render_gif,
-            )
-        except Exception as e:
-            await interaction.followup.send(f"❌ Could not render level card: {e}", ephemeral=True)
-            return
-        await interaction.followup.send(file=discord.File(str(cached_path)))
+            try:
+                await asyncio.to_thread(
+                    _render_levelcard_sync,
+                    bg_bytes,
+                    bg_url.lower().endswith(".gif") and supporter,
+                    avatar_bytes,
+                    style_colors,
+                    progress,
+                    str(target.display_name),
+                    level,
+                    rank,
+                    xp,
+                    xp_for_next_level,
+                    status_color,
+                    cached_path,
+                    render_gif,
+                )
+            except Exception as e:
+                await interaction.followup.send(f"❌ Could not render level card: {e}", ephemeral=True)
+                return
+            await interaction.followup.send(file=discord.File(str(cached_path)))
 
     @app_commands.command(name="xpset", description="Set a user's XP and level (Admin only)")
     @app_commands.describe(user="User", xp="XP value", level="Level value")

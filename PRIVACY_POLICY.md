@@ -27,6 +27,7 @@ This may include:
 - Quest progress
 - Reminder timers
 - Moderation records (warnings, mutes, etc.)
+- DM opt-out preference (if you use `/optout` to stop receiving staff DMs)
 
 ### Supporter Data
 

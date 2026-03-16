@@ -13,6 +13,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from . import anti_abuse
 from .module_registry import is_module_enabled
 
 try:
@@ -343,6 +344,7 @@ class TranslateCog(
 
     # ---------- Commands ----------
     @app_commands.command(name="text", description="Translate text into another language.")
+    @app_commands.checks.cooldown(5, 60.0, key=lambda i: i.user.id)
     @app_commands.describe(
         translate_to="Language to translate into.",
         text="The text you want to translate.",
@@ -477,7 +479,8 @@ class TranslateCog(
             return
 
         try:
-            result = await self._translate_with_details(translate_text, source_language, target_language)
+            async with anti_abuse.heavy_task_slot():
+                result = await self._translate_with_details(translate_text, source_language, target_language)
         except Exception:
             await interaction.response.send_message("Translation failed. Please try again later.", ephemeral=True)
             return

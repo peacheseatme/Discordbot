@@ -13,6 +13,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from . import anti_abuse
 from .module_registry import is_module_enabled
 from .themes import get_command_response_for_interaction
 
@@ -267,6 +268,7 @@ class FunCog(commands.Cog):
 
     @app_commands.command(name="petpet", description="Generate a petpet GIF of a user's avatar")
     @app_commands.describe(member="User to petpet")
+    @app_commands.checks.cooldown(1, 15.0, key=lambda i: i.user.id)
     async def petpet_cmd(
         self,
         interaction: discord.Interaction,
@@ -287,14 +289,15 @@ class FunCog(commands.Cog):
         avatar_url = member.display_avatar.replace(size=256).url
         await interaction.response.defer()
 
-        async with _http_session(self.bot) as session:
-            async with session.get(avatar_url) as r:
-                img_bytes = await r.read()
+        async with anti_abuse.heavy_task_slot():
+            async with _http_session(self.bot) as session:
+                async with session.get(avatar_url) as r:
+                    img_bytes = await r.read()
 
-        buf_in = io.BytesIO(img_bytes)
-        buf_out = io.BytesIO()
-        petpet.make(buf_in, buf_out)
-        buf_out.seek(0)
+            buf_in = io.BytesIO(img_bytes)
+            buf_out = io.BytesIO()
+            petpet.make(buf_in, buf_out)
+            buf_out.seek(0)
 
         msg = get_command_response_for_interaction(
             interaction,
