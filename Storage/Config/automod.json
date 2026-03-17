@@ -346,7 +346,7 @@
   "333949691962195969": {
     "enabled": false,
     "count_rule_violations_as_warns": false,
-    "log_channel_id": null,
+    "log_channel_id": 787720264342437889,
     "whitelist": {
       "roles": [
         1410596903179128842
@@ -361,7 +361,9 @@
     "channel_overrides": {},
     "bad_words": {
       "enabled": true,
-      "words": [],
+      "words": [
+        "ppp"
+      ],
       "action": "delete",
       "delete_message": false,
       "escalation": []

@@ -31,6 +31,16 @@
       "last_payment": "2026-03-05T23:57:36",
       "total_usd": 0.0,
       "kofi_transaction_ids": []
+    },
+    "839014570680909845": {
+      "discord_id": 839014570680909845,
+      "email": "test@gmail.com",
+      "tier": "donation",
+      "active": false,
+      "first_seen": "2026-03-17T10:18:57",
+      "last_payment": "2026-03-17T10:18:57",
+      "total_usd": 0.0,
+      "kofi_transaction_ids": []
     }
   },
   "unlinked_donations": [

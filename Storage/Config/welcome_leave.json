@@ -34,17 +34,17 @@
   "333949691962195969": {
     "welcome": {
       "enabled": true,
-      "channel_id": 820694631066632202,
+      "channel_id": 787720264342437889,
       "message": "test",
-      "embed_enabled": false
+      "embed_enabled": true
     },
     "leave": {
       "enabled": true,
-      "channel_id": 820694631066632202,
-      "message": "eee",
+      "channel_id": 787720264342437889,
+      "message": "bye",
       "embed_enabled": false,
-      "exit_survey_enabled": false,
-      "exit_survey_log_channel_id": null
+      "exit_survey_enabled": true,
+      "exit_survey_log_channel_id": 787720264342437889
     }
   },
   "1190489702269206671": {

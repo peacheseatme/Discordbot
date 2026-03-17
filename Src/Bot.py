@@ -49,6 +49,7 @@ if _modules_path not in sys.path:
     sys.path.insert(0, _modules_path)
 
 from Modules import anti_abuse
+from Modules import checks as module_checks
 from Modules import json_cache
 from Modules.themes import get_command_response, get_command_response_for_interaction
 
@@ -83,6 +84,8 @@ def _dm_optout_remove(user_id: int) -> None:
     ids = _dm_optout_ids()
     ids.discard(str(user_id))
     save_json(DM_OPTOUT_FILE, {"user_ids": list(ids)})
+
+
 # ─────────────────────────────────────────────────────────
 
 intents = discord.Intents.default()
@@ -103,7 +106,7 @@ async def _global_anti_abuse_check(interaction: discord.Interaction) -> bool:
     """Global slash-command anti-abuse gate."""
     return await anti_abuse.should_allow_interaction(interaction)
 
-OWNER_ID = 0  # Replace with your Discord user ID
+OWNER_ID = 1168282467162136656  # Replace with your Discord user ID
 
 
 def _dispatch_module_log_event(
@@ -179,11 +182,14 @@ BOT_OWNER_ID = 0  # Replace with your Discord user ID
 GALAXY_BOT_SERVER_ID = 0  # Replace with your guild ID
 PERMANENT_INVITE = "https://discord.gg/xxxxxxxx"  # Replace with your support server invite
 DONATION_URL = "https://ko-fi.com/coffeecord"
-GITHUB_URL = "https://github.com/peacheseatme/Discordbot"  # TODO: replace with real URL
-TOPGG_URL = "https://top.gg/bot/YOUR_BOT_ID"  # TODO: replace with real bot ID
+GITHUB_URL = "https://github.com/peacheseatme/Coffeecord"
+PRIVACY_POLICY_URL = f"{GITHUB_URL}/blob/main/PRIVACY_POLICY.md"
+TERMS_URL = f"{GITHUB_URL}/blob/main/TERMS_OF_SERVICE.md"
+TOPGG_URL = "https://top.gg/bot/YOUR_BOT_ID"  # Replace with real bot ID for top.gg listing
+# Replace YOUR_CLIENT_ID with your bot's application ID.
 BOT_INVITE_URL = "https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot%20applications.commands"
 SUPPORT_SERVER = PERMANENT_INVITE
-BOT_VERSION = "1.0.0"  # TODO: keep updated
+BOT_VERSION = "1.0.1"  # TODO: keep updated
 SUPPORTERS_FILE = os.path.join(_storage_dir, "Data", "supporters.json")
 SUPPORTER_GRACE_DAYS = 35
 pending_kofi_links: dict[str, list[int]] = {}
@@ -502,6 +508,8 @@ async def about_cmd(interaction: discord.Interaction):
     view.add_item(discord.ui.Button(label="Invite Me", url=BOT_INVITE_URL, emoji="🤖", style=discord.ButtonStyle.link, row=1))
     view.add_item(discord.ui.Button(label="Support Server", url=SUPPORT_SERVER, emoji="💬", style=discord.ButtonStyle.link, row=1))
     view.add_item(discord.ui.Button(label="Ko-fi", url=DONATION_URL, emoji="☕", style=discord.ButtonStyle.link, row=1))
+    view.add_item(discord.ui.Button(label="Privacy Policy", url=PRIVACY_POLICY_URL, emoji="🔒", style=discord.ButtonStyle.link, row=2))
+    view.add_item(discord.ui.Button(label="Terms of Service", url=TERMS_URL, emoji="📜", style=discord.ButtonStyle.link, row=2))
 
     await interaction.response.send_message(embed=embed, view=view)
 
@@ -1499,7 +1507,7 @@ async def unban(interaction: discord.Interaction, user_id: str):
   
 @tree.command(name="giverole", description="Give a role to a user.")
 @app_commands.describe(member="User to give the role to", role="Role to give")
-@app_commands.checks.has_permissions(manage_roles=True)
+@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def giverole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
     if role in member.roles:
         await interaction.response.send_message(
@@ -1533,7 +1541,7 @@ async def giverole(interaction: discord.Interaction, member: discord.Member, rol
 
 @tree.command(name="removerole", description="Remove a role from a user.")
 @app_commands.describe(member="User to remove the role from", role="Role to remove")
-@app_commands.checks.has_permissions(manage_roles=True)
+@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def removerole(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
     if role not in member.roles:
         await interaction.response.send_message(
@@ -1725,7 +1733,7 @@ mute_config = load_mute_config()
 
 @tree.command(name="mute", description="Mute a member for a specified time.")
 @app_commands.describe(member="User to mute", duration="Duration (number)", unit="Time unit: m for minutes, h for hours", reason="Reason for muting")
-@app_commands.checks.has_permissions(manage_roles=True)
+@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def mute(interaction: discord.Interaction, member: discord.Member, duration: int, unit: str, reason: str = None):
     unit = unit.lower()
     if unit not in ("m", "h"):
@@ -1790,7 +1798,7 @@ async def mute(interaction: discord.Interaction, member: discord.Member, duratio
 
 @tree.command(name="unmute", description="Unmute a member manually")
 @app_commands.describe(member="User to unmute")
-@app_commands.checks.has_permissions(manage_roles=True)
+@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def unmute(interaction: discord.Interaction, member: discord.Member):
     guild_id = str(interaction.guild_id)
     mute_role_id = mute_config.get(guild_id)
@@ -1831,7 +1839,7 @@ muterole_group = app_commands.Group(name="muterole", description="Mute role mana
 
 
 @muterole_group.command(name="create", description="Create and set a mute role")
-@app_commands.checks.has_permissions(manage_roles=True)
+@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def muterole_create(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     guild = interaction.guild
@@ -1863,7 +1871,7 @@ async def muterole_create(interaction: discord.Interaction):
 
 @muterole_group.command(name="update", description="Update the mute role")
 @app_commands.describe(role="The new mute role")
-@app_commands.checks.has_permissions(manage_roles=True)
+@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def muterole_update(interaction: discord.Interaction, role: discord.Role):
     mute_config[str(interaction.guild_id)] = role.id
     save_mute_config(mute_config)
@@ -1889,7 +1897,7 @@ tree.add_command(muterole_group)
 
 @tree.command(name="hardmute", description="Mute and remove all roles from a user")
 @app_commands.describe(member="Member to hardmute", reason="Reason for hardmute")
-@app_commands.checks.has_permissions(manage_roles=True)
+@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def hardmute(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
     guild_id = str(interaction.guild_id)
     mute_role_id = mute_config.get(guild_id)
@@ -2150,7 +2158,7 @@ from discord import Interaction
 from discord.ext import commands, tasks
 
 @tree.command(name="autorole_legacy", description="Legacy autorole command (deprecated).")
-@app_commands.checks.has_permissions(manage_roles=True)
+@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def autorole(interaction: discord.Interaction):
     guild_id = str(interaction.guild.id)
     config = autorole_config.get(guild_id, {})
@@ -2183,7 +2191,7 @@ async def autorole(interaction: discord.Interaction):
     event="When to apply the role (on_join, on_message, on_thread)",
     action="Add or remove the role"
 )
-@app_commands.checks.has_permissions(manage_roles=True)
+@app_commands.check(module_checks.can_manage_roles_or_moderate)
 async def setautorole(interaction: discord.Interaction, role: discord.Role, event: str, action: str):
     if event not in ["on_join", "on_message", "on_thread"]:
         await interaction.response.send_message(
@@ -3254,6 +3262,12 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         return await _send_app_error(
             interaction,
             f"⏳ This command is on cooldown. Try again in `{error.retry_after:.1f}`s.",
+        )
+
+    if isinstance(error, module_checks.MissingRoleOrModeratePermission):
+        return await _send_app_error(
+            interaction,
+            "🚫 You need **Manage Roles**, **Moderate Members**, or **Manage Server** to use this command.",
         )
 
     if isinstance(error, app_commands.CheckFailure):

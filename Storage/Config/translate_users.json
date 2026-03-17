@@ -22,5 +22,11 @@
     "live_translate": true,
     "ephemeral": true,
     "dm_delivery": false
+  },
+  "839014570680909845": {
+    "language": "en",
+    "live_translate": false,
+    "ephemeral": true,
+    "dm_delivery": false
   }
 }

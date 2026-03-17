@@ -13,6 +13,7 @@ from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFont, ImageSequence
 
 from . import anti_abuse
+from . import checks as module_checks
 from .json_cache import get as _json_get, set_ as _json_set
 from .module_registry import is_module_enabled
 from .themes import get_command_response_for_interaction
@@ -876,7 +877,7 @@ class LevelingCog(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @levelreward_group.command(name="add", description="Add a level reward role.")
-    @app_commands.checks.has_permissions(manage_roles=True)
+    @app_commands.check(module_checks.can_manage_roles_or_moderate)
     async def levelreward_add(
         self,
         interaction: discord.Interaction,
@@ -918,7 +919,7 @@ class LevelingCog(commands.Cog):
         await interaction.response.send_message(msg, ephemeral=True)
 
     @levelreward_group.command(name="remove", description="Remove a level reward role.")
-    @app_commands.checks.has_permissions(manage_roles=True)
+    @app_commands.check(module_checks.can_manage_roles_or_moderate)
     async def levelreward_remove(self, interaction: discord.Interaction, level: int) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)
@@ -980,7 +981,7 @@ class LevelingCog(commands.Cog):
         )
 
     @levelreward_group.command(name="mode", description="Choose whether to replace old reward roles.")
-    @app_commands.checks.has_permissions(manage_roles=True)
+    @app_commands.check(module_checks.can_manage_roles_or_moderate)
     async def levelreward_mode(self, interaction: discord.Interaction, replace_old_roles: bool) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("This command can only be used in servers.", ephemeral=True)

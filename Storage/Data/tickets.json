@@ -35,5 +35,16 @@
     ],
     "ticket_message": "Feel free to contact support anytime!",
     "tickets": {}
+  },
+  "333949691962195969": {
+    "ticket_channel": 787720264342437889,
+    "support_roles": [
+      1409608070971261042
+    ],
+    "ticket_types": [
+      "any"
+    ],
+    "ticket_message": "Click below to create a ticket.",
+    "tickets": {}
   }
 }
