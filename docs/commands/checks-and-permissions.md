@@ -53,7 +53,7 @@ Prefix commands use manual checks (no decorator):
 ```python
 @bot.command(name="synccommands")
 async def sync_commands_prefix(ctx: commands.Context):
-    if ctx.author.id != BOT_OWNER_ID:
+    if ctx.author.id != OWNER_ID:
         return  # Silent fail for non-owners
     ...
 ```
@@ -81,5 +81,5 @@ async def levelcard_customize(self, interaction: discord.Interaction, ...) -> No
 |-------|-------|--------|
 | Guild only | `if interaction.guild is None` | `if ctx.guild is None` |
 | Manage Server | `@app_commands.checks.has_permissions(manage_guild=True)` | `ctx.author.guild_permissions.manage_guild` |
-| Owner only | Custom decorator or manual | `ctx.author.id != BOT_OWNER_ID` |
+| Owner only | Custom decorator or manual | `ctx.author.id != OWNER_ID` |
 | Module enabled | `is_module_enabled(guild_id, "module_id")` | N/A (prefix commands are in Bot.py) |

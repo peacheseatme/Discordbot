@@ -15,7 +15,7 @@ Users invoke commands with `.commandname` (e.g. `.help`, `.synccommands`).
 ```python
 @bot.command(name="synccommands")
 async def sync_commands_prefix(ctx: commands.Context):
-    if ctx.author.id != BOT_OWNER_ID:
+    if ctx.author.id != OWNER_ID:
         return
     try:
         synced = await tree.sync()
@@ -57,7 +57,7 @@ Prefix commands often use manual owner checks:
 ```python
 @bot.command(name="clearchache")
 async def clearchache_prefix(ctx: commands.Context):
-    if ctx.author.id != BOT_OWNER_ID:
+    if ctx.author.id != OWNER_ID:
         return
     # ... owner-only logic
 ```

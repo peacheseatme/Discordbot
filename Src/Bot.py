@@ -178,17 +178,16 @@ autorole_config = {}
 verify_config = {}
 GUILD_ID = 0  # Replace with your guild ID
 CONFIG_FILE = os.path.join(_storage_dir, "Config", "autorole_config.json")
-BOT_OWNER_ID = 0  # Replace with your Discord user ID
 GALAXY_BOT_SERVER_ID = 0  # Replace with your guild ID
 PERMANENT_INVITE = "https://discord.gg/xxxxxxxx"  # Replace with your support server invite
 DONATION_URL = "https://ko-fi.com/coffeecord"
 GITHUB_URL = "https://github.com/peacheseatme/Coffeecord"
 PRIVACY_POLICY_URL = f"{GITHUB_URL}/blob/main/PRIVACY_POLICY.md"
 TERMS_URL = f"{GITHUB_URL}/blob/main/TERMS_OF_SERVICE.md"
-TOPGG_URL = "https://top.gg/bot/YOUR_BOT_ID"  # Replace with real bot ID for top.gg listing
+TOPGG_URL = "https://top.gg/bot/1390501770437984377"  # Replace with real bot ID for top.gg listing
 # Replace YOUR_CLIENT_ID with your bot's application ID.
-BOT_INVITE_URL = "https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot%20applications.commands"
-SUPPORT_SERVER = PERMANENT_INVITE
+BOT_INVITE_URL = "https://discord.com/oauth2/authorize?client_id=1390501770437984377&permissions=8866461766385655&response_type=code&redirect_uri=https%3A%2F%2Fdiscord.com%2Foauth2%2Fauthorize%3Fclient_id%3D1390501770437984377&integration_type=0&scope=bot+identify+applications.commands+applications.commands.permissions.update"
+SUPPORT_SERVER = "https://discord.com/invite/HnJfJgcwZ2"
 BOT_VERSION = "1.0.1"  # TODO: keep updated
 SUPPORTERS_FILE = os.path.join(_storage_dir, "Data", "supporters.json")
 SUPPORTER_GRACE_DAYS = 35
@@ -497,10 +496,11 @@ async def about_cmd(interaction: discord.Interaction):
     if interaction.client.user:
         embed.set_thumbnail(url=interaction.client.user.display_avatar.url)
     embed.add_field(name="Version", value=BOT_VERSION, inline=False)
-    embed.add_field(name="Developer", value=f"<@{BOT_OWNER_ID}>", inline=False)
+    developer_value = f"<@{OWNER_ID}>" if OWNER_ID else "Not configured"
+    embed.add_field(name="Developer", value=developer_value, inline=False)
     embed.add_field(name="Servers", value=f"{len(interaction.client.guilds)} servers", inline=False)
     embed.add_field(name="Ping", value=f"{round(interaction.client.latency * 1000)} ms", inline=False)
-    embed.set_footer(text="Coffeecord • Made with ☕")
+    embed.set_footer(text="Coffeecord • Made with ☕ and discord.py ❤")
 
     view = discord.ui.View()
     view.add_item(discord.ui.Button(label="GitHub", url=GITHUB_URL, emoji="🐙", style=discord.ButtonStyle.link, row=0))
@@ -3299,7 +3299,7 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 # Owner-only prefix commands (non-owner: no response)
 @bot.command(name="synccommands")
 async def sync_commands_prefix(ctx: commands.Context):
-    if ctx.author.id != BOT_OWNER_ID:
+    if ctx.author.id != OWNER_ID:
         return
     try:
         synced = await tree.sync()
@@ -3310,7 +3310,7 @@ async def sync_commands_prefix(ctx: commands.Context):
 
 @bot.command(name="clearchache")
 async def clearchache_prefix(ctx: commands.Context):
-    if ctx.author.id != BOT_OWNER_ID:
+    if ctx.author.id != OWNER_ID:
         return
     msg = None
     try:
