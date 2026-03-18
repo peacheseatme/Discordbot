@@ -22,5 +22,13 @@
     "rules": [],
     "pending": [],
     "first_message_users": []
+  },
+  "333949691962195969": {
+    "enabled": true,
+    "rules": [],
+    "pending": [],
+    "first_message_users": [
+      555652788592443392
+    ]
   }
 }

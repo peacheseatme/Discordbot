@@ -184,6 +184,7 @@ DONATION_URL = "https://ko-fi.com/coffeecord"
 GITHUB_URL = "https://github.com/peacheseatme/Coffeecord"
 PRIVACY_POLICY_URL = f"{GITHUB_URL}/blob/main/PRIVACY_POLICY.md"
 TERMS_URL = f"{GITHUB_URL}/blob/main/TERMS_OF_SERVICE.md"
+PERMISSIONS_DOC_URL = f"{GITHUB_URL}/blob/main/docs/commands/permissions.md"
 TOPGG_URL = "https://top.gg/bot/1390501770437984377"  # Replace with real bot ID for top.gg listing
 # Replace YOUR_CLIENT_ID with your bot's application ID.
 BOT_INVITE_URL = "https://discord.com/oauth2/authorize?client_id=1390501770437984377&permissions=8866461766385655&response_type=code&redirect_uri=https%3A%2F%2Fdiscord.com%2Foauth2%2Fauthorize%3Fclient_id%3D1390501770437984377&integration_type=0&scope=bot+identify+applications.commands+applications.commands.permissions.update"
@@ -366,7 +367,7 @@ class Theme:
 
 COMMAND_CATEGORIES = {
     "General": [
-        "/help", "/support us", "/say", "/dm", "/poll", "/nickname",
+        "/help", "/command_perms", "/support us", "/say", "/dm", "/poll", "/nickname",
         "/optout", "/optin"
     ],
     "Ko-fi": [
@@ -512,6 +513,31 @@ async def about_cmd(interaction: discord.Interaction):
     view.add_item(discord.ui.Button(label="Terms of Service", url=TERMS_URL, emoji="📜", style=discord.ButtonStyle.link, row=2))
 
     await interaction.response.send_message(embed=embed, view=view)
+
+
+@tree.command(name="command_perms", description="View command permissions documentation.")
+async def command_perms(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="Command Permissions",
+        description=(
+            "View the full permissions reference: which commands need which user permissions, "
+            "and what bot permissions are required for each feature."
+        ),
+        color=discord.Color.blurple(),
+        url=PERMISSIONS_DOC_URL,
+    )
+    embed.add_field(
+        name="Quick links",
+        value=f"[📋 Permissions doc]({PERMISSIONS_DOC_URL})",
+        inline=False,
+    )
+    embed.set_footer(text="Includes call create, moderation, and all slash commands.")
+    view = discord.ui.View()
+    view.add_item(
+        discord.ui.Button(label="Open permissions doc", url=PERMISSIONS_DOC_URL, emoji="📋", style=discord.ButtonStyle.link)
+    )
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
 
 class DonateView(discord.ui.View):
     def __init__(self):
@@ -1053,7 +1079,13 @@ async def purge(interaction: discord.Interaction, amount: int, channel: discord.
         else:  # all
             return True
 
-    deleted = await channel.purge(limit=amount, check=check)
+    try:
+        deleted = await channel.purge(limit=amount, check=check)
+    except discord.Forbidden:
+        return await interaction.followup.send("❌ I don't have permission to delete messages in that channel.", ephemeral=True)
+    except discord.HTTPException as e:
+        return await interaction.followup.send(f"❌ Failed to purge: {e}", ephemeral=True)
+
     await interaction.followup.send(f"✅ Deleted {len(deleted)} messages from {channel.mention} ({msg_type})", ephemeral=True)
     _dispatch_module_log_event(
         interaction.guild,
@@ -1100,7 +1132,12 @@ async def specific_purge(interaction: discord.Interaction, user: discord.Member,
         return deleted_count
 
     delete_messages.start_time = asyncio.get_running_loop().time()
-    deleted_count = await delete_messages()
+    try:
+        deleted_count = await delete_messages()
+    except discord.Forbidden:
+        return await interaction.followup.send("❌ I don't have permission to delete messages in that channel.", ephemeral=True)
+    except discord.HTTPException as e:
+        return await interaction.followup.send(f"❌ Failed to purge: {e}", ephemeral=True)
 
     await interaction.followup.send(
         f"✅ Deleted {deleted_count} messages from {user.mention} in {channel.mention}",
@@ -1192,11 +1229,11 @@ async def get_log_message(interaction: discord.Interaction):
     reason = options.get("reason", "No reason provided")
 
     target_mention = "Unknown"
-    if target_id:
+    if target_id and interaction.guild:
         try:
             target = await interaction.guild.fetch_member(int(target_id))
             target_mention = target.mention
-        except:
+        except Exception:
             target_mention = f"<@{target_id}>"
 
     if cmd_name == "mute":
@@ -1211,7 +1248,9 @@ async def get_log_message(interaction: discord.Interaction):
     return f"📘 `{cmd_name}` command used by {user.mention}"
 
 # --- Send Log to Channel ---
-async def log_action(interaction: discord.Interaction, message: str):
+async def log_action(interaction: discord.Interaction, message: str) -> None:
+    if not interaction.guild_id or not interaction.guild:
+        return
     guild_id = str(interaction.guild_id)
     cfg = logging_config.get("guilds", {}).get(guild_id, {})
     log_events = cfg.get("log_events", {})
@@ -1960,25 +1999,96 @@ marriages = {}  # user_id -> partner_id
 marriage_requests = {}  # user_id -> requester_id (pending requests)
 
 reminders = []
-timers = {}  # timer_id -> {user, end}
+timers = {}  # timer_id -> {user_id, end}
+_timer_counter = 0
+_timer_lock = asyncio.Lock()
+
+REMINDERS_FILE = os.path.join(_storage_dir, "Data", "reminders.json")
+TIMERS_FILE = os.path.join(_storage_dir, "Data", "timers.json")
+_REMINDERS_TIMERS_LOADED = False
+
+
+def _save_reminders() -> None:
+    data = [
+        {"user_id": r["user_id"], "message": r["message"], "time": r["time"].isoformat()}
+        for r in reminders
+    ]
+    save_json(REMINDERS_FILE, data)
+
+
+def _save_timers() -> None:
+    data = {
+        str(tid): {"user_id": t["user_id"], "end": t["end"].isoformat()}
+        for tid, t in timers.items()
+    }
+    save_json(TIMERS_FILE, data)
+
+
+async def _run_loaded_timer(timer_id: int, user_id: int, end: datetime) -> None:
+    """Run a timer loaded from disk until it expires."""
+    delay = (end - datetime.now()).total_seconds()
+    if delay > 0:
+        await asyncio.sleep(delay)
+    if timer_id in timers:
+        try:
+            user = bot.get_user(user_id) or await bot.fetch_user(user_id)
+            await user.send(f"\u23F0 Timer #{timer_id} is up!")
+        except Exception:
+            pass
+        del timers[timer_id]
+        _save_timers()
+
+
+def _load_reminders_and_timers() -> None:
+    """Load reminders and timers from disk (call from on_ready, once)."""
+    global _timer_counter, _REMINDERS_TIMERS_LOADED
+    if _REMINDERS_TIMERS_LOADED:
+        return
+    _REMINDERS_TIMERS_LOADED = True
+    data = load_json(REMINDERS_FILE, [])
+    for r in data:
+        try:
+            reminders.append({
+                "user_id": r["user_id"],
+                "message": r["message"],
+                "time": datetime.fromisoformat(r["time"]),
+            })
+        except (KeyError, ValueError):
+            pass
+    data = load_json(TIMERS_FILE, {})
+    for tid_str, t in data.items():
+        try:
+            tid = int(tid_str)
+            end = datetime.fromisoformat(t["end"])
+            if end <= datetime.now():
+                continue
+            timers[tid] = {"user_id": t["user_id"], "end": end}
+            _timer_counter = max(_timer_counter, tid)
+            asyncio.create_task(_run_loaded_timer(tid, t["user_id"], end))
+        except (KeyError, ValueError):
+            pass
+
 
 @tasks.loop(seconds=60)
 async def reminder_checker():
     now = datetime.now()
     for reminder in reminders[:]:
-        if reminder['time'] <= now:
+        if reminder["time"] <= now:
             try:
-                await reminder['user'].send(f"\u23F0 Reminder: {reminder['message']}")
-            except:
+                user = bot.get_user(reminder["user_id"]) or await bot.fetch_user(reminder["user_id"])
+                await user.send(f"\u23F0 Reminder: {reminder['message']}")
+            except Exception:
                 pass
             reminders.remove(reminder)
+            _save_reminders()
 
 @tree.command(name="remindme", description="Set a reminder with a message and time.")
 @app_commands.describe(message="Reminder text", date="Date (MM/DD/YY)", time="Time (HH:MM 24hr)")
 async def remindme(interaction: discord.Interaction, message: str, date: str, time: str):
     try:
         remind_time = datetime.strptime(f"{date} {time}", "%m/%d/%y %H:%M")
-        reminders.append({"user": interaction.user, "message": message, "time": remind_time})
+        reminders.append({"user_id": interaction.user.id, "message": message, "time": remind_time})
+        _save_reminders()
         await interaction.response.send_message(f"\u2705 Reminder set for {remind_time.strftime('%m/%d/%y %H:%M')}", ephemeral=True)
     except ValueError:
         await interaction.response.send_message("\u274C Invalid date or time format. Use MM/DD/YY HH:MM.", ephemeral=True)
@@ -1995,16 +2105,25 @@ async def starttimer(interaction: discord.Interaction, duration: str):
         elif unit == 'h': seconds = value * 3600
         else: raise ValueError("Invalid unit")
 
-        timer_id = len(timers) + 1
+        async with _timer_lock:
+            global _timer_counter
+            _timer_counter += 1
+            timer_id = _timer_counter
         end_time = datetime.now() + timedelta(seconds=seconds)
-        timers[timer_id] = {"user": interaction.user, "end": end_time}
+        timers[timer_id] = {"user_id": interaction.user.id, "end": end_time}
+        _save_timers()
 
         await interaction.response.send_message(f"\u23F3 Timer #{timer_id} started for {value}{unit}", ephemeral=True)
         await asyncio.sleep(seconds)
 
         if timer_id in timers:
-            await interaction.user.send(f"\u23F0 Timer #{timer_id} is up!")
+            try:
+                user = bot.get_user(timers[timer_id]["user_id"]) or await bot.fetch_user(timers[timer_id]["user_id"])
+                await user.send(f"\u23F0 Timer #{timer_id} is up!")
+            except Exception:
+                pass
             del timers[timer_id]
+            _save_timers()
 
     except ValueError:
         await interaction.response.send_message("\u274C Invalid format. Use like `10s`, `5m`, or `2h`.", ephemeral=True)
@@ -2016,7 +2135,7 @@ async def checktimers(interaction: discord.Interaction):
     user_timers = [
         f"\u23F3 Timer #{tid} ends at <t:{int(timer['end'].timestamp())}:R>"
         for tid, timer in timers.items()
-        if timer["user"].id == interaction.user.id
+        if timer["user_id"] == interaction.user.id
     ]
     
     if user_timers:
@@ -2032,11 +2151,12 @@ async def endtimer(interaction: discord.Interaction, timer_id: int):
         await interaction.response.send_message("\u274C Timer not found.", ephemeral=True)
         return
 
-    if timer["user"].id != interaction.user.id:
+    if timer["user_id"] != interaction.user.id:
         await interaction.response.send_message("\u26D4 You can only end your own timers.", ephemeral=True)
         return
 
     del timers[timer_id]
+    _save_timers()
     await interaction.response.send_message(f"\u23F9 Timer #{timer_id} has been cancelled.", ephemeral=True)
 
 class SayView(discord.ui.View):
@@ -3155,29 +3275,42 @@ active_vc_members = {}  # {guild_id: {user_id: join_time}}
 async def on_voice_state_update(member, before, after):
     guild_id = str(member.guild.id)
     user_id = str(member.id)
+    calls = load_calls()
+    guild_calls = calls.get(guild_id, {})
 
-    if before.channel is None and after.channel is not None:
-        # CoffeeCord call: kick if user hasn't used /call join
-        calls = load_calls()
-        guild_calls = calls.get(guild_id, {})
+    # --- Joining a channel (from no VC or from another VC) ---
+    if after.channel is not None:
         call_data = guild_calls.get(str(after.channel.id))
-        if call_data and str(member.id) not in call_data.get("members", []):
-            try:
-                await member.move_to(None)
-            except (discord.Forbidden, discord.HTTPException):
-                pass
-            try:
-                await member.send(
-                    "📞 **You need to use /call join to join this call.**\n"
-                    f"Use `/call join` with channel <#{after.channel.id}> to join."
-                )
-            except (discord.Forbidden, discord.HTTPException):
-                pass
-            return
+        if call_data:
+            if str(member.id) not in call_data.get("members", []):
+                try:
+                    await member.move_to(None)
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
+                password_hint = ""
+                if call_data.get("password"):
+                    password_hint = " Use the correct password with `/call join`."
+                try:
+                    await member.send(
+                        "📞 **You need to use /call join to join this call.**\n"
+                        f"Use `/call join` with channel <#{after.channel.id}> to join.{password_hint}"
+                    )
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
+                return
+            _cancel_call_empty_timer(after.channel.id)
 
-        active_vc_members.setdefault(guild_id, {})[user_id] = asyncio.get_event_loop().time()
-    elif before.channel is not None and after.channel is None:
-        await _get_leveling_module().award_voice_xp(bot, member, active_vc_members)
+        if before.channel is None:
+            active_vc_members.setdefault(guild_id, {})[user_id] = asyncio.get_event_loop().time()
+
+    # --- Leaving a channel (disconnect or move) ---
+    if before.channel is not None:
+        call_data = guild_calls.get(str(before.channel.id))
+        if call_data and len(before.channel.members) == 0:
+            _schedule_call_empty_delete(before.channel.id, guild_id)
+
+        if after.channel is None:
+            await _get_leveling_module().award_voice_xp(bot, member, active_vc_members)
 
 # ─── Console logging: all commands and processes ─────────────────────────────
 def _log_cmd(prefix: str, name: str, user: discord.abc.User, guild: discord.Guild | None, channel: discord.abc.Messageable | None) -> None:
@@ -3233,12 +3366,15 @@ async def on_command_error(ctx, error):
         # Optional: log error to console only
         print(f"[ERROR] {type(error).__name__}: {error}")
 
-async def _send_app_error(interaction: discord.Interaction, message: str):
+async def _send_app_error(interaction: discord.Interaction, message: str) -> None:
     """Send an ephemeral app-command error regardless of response state."""
-    if interaction.response.is_done():
-        await interaction.followup.send(message, ephemeral=True)
-    else:
-        await interaction.response.send_message(message, ephemeral=True)
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+    except (discord.Forbidden, discord.HTTPException):
+        pass
 
 @tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
@@ -3292,7 +3428,8 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
     )
 
     import traceback
-    print(f"[APP_COMMAND_ERROR] /{interaction.command.qualified_name if interaction.command else 'unknown'}")
+    cmd_name = interaction.command.qualified_name if interaction.command else "unknown"
+    print(f"[APP_COMMAND_ERROR] /{cmd_name}")
     traceback.print_exception(type(original), original, original.__traceback__)
 
 
@@ -3337,6 +3474,53 @@ async def debug_commands(interaction: discord.Interaction):
 # Helper to load/save calls
 # ---------------------------
 CALLS_FILE = os.path.join(_storage_dir, "Temp", "active_calls.json")
+CALL_EMPTY_DELETE_SECONDS = 15
+_call_empty_timers = {}  # channel_id -> asyncio.Task
+
+
+def _cancel_call_empty_timer(channel_id: int) -> None:
+    """Cancel a pending auto-delete for an empty call channel."""
+    task = _call_empty_timers.pop(str(channel_id), None)
+    if task and not task.done():
+        task.cancel()
+
+
+async def _delete_call_after_empty(channel_id: int, guild_id: str) -> None:
+    """Wait 15 seconds, then delete the call if still empty."""
+    try:
+        await asyncio.sleep(CALL_EMPTY_DELETE_SECONDS)
+    except asyncio.CancelledError:
+        return
+    finally:
+        _call_empty_timers.pop(str(channel_id), None)
+
+    calls = load_calls()
+    guild_calls = calls.get(guild_id, {})
+    if str(channel_id) not in guild_calls:
+        return
+
+    channel = bot.get_channel(channel_id)
+    if channel is not None and len(channel.members) > 0:
+        return  # Someone joined in time
+    if channel is not None:
+        try:
+            await channel.delete(reason="Call empty for 15 seconds")
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+    del guild_calls[str(channel_id)]
+    if not guild_calls:
+        del calls[guild_id]
+    else:
+        calls[guild_id] = guild_calls
+    save_calls(calls)
+
+
+def _schedule_call_empty_delete(channel_id: int, guild_id: str) -> None:
+    """Schedule auto-delete if the call channel is empty for 15 seconds."""
+    _cancel_call_empty_timer(channel_id)
+    task = asyncio.create_task(_delete_call_after_empty(channel_id, guild_id))
+    _call_empty_timers[str(channel_id)] = task
+
 
 def load_calls():
     if not os.path.exists(CALLS_FILE):
@@ -3367,6 +3551,7 @@ call_group = app_commands.Group(name="call", description="CoffeeCord call comman
 
 
 @call_group.command(name="create", description="Create a temporary private call channel.")
+@app_commands.checks.has_permissions(manage_channels=True)
 async def call(
     interaction: discord.Interaction,
     user1: discord.Member | None = None,
@@ -3427,7 +3612,7 @@ async def call(
                 msg += f"🔑 **Password:** `{password}`"
 
             await member.send(msg)
-        except:
+        except Exception:
             # User has DMs off or blocked the bot — ignore
             pass
 
@@ -3490,7 +3675,7 @@ async def call_join(
         if str(member.id) not in call_data["members"]:
             try:
                 await member.move_to(None)
-            except:
+            except Exception:
                 pass
 
     # Save changes
@@ -3501,7 +3686,7 @@ async def call_join(
     # DM invite link
     try:
         await user.send(f"✅ You joined the call! Click to join: <#{channel.id}>")
-    except:
+    except Exception:
         pass
 
     await interaction.response.send_message(f"✅ You joined <#{channel.id}>", ephemeral=True)
@@ -3569,7 +3754,7 @@ async def call_add(interaction: discord.Interaction, user: discord.Member):
     # Send DM
     try:
         await user.send(dm_text)
-    except:
+    except Exception:
         pass
 
     await interaction.response.send_message(f"📨 Sent call invite to {user.mention}.")
@@ -3623,7 +3808,7 @@ async def call_remove(interaction: discord.Interaction, user: discord.Member):
     if user.voice and user.voice.channel and user.voice.channel.id == channel.id:
         try:
             await user.move_to(None, reason="Removed from CoffeeCord call")
-        except:
+        except Exception:
             pass
 
     # ---------------------------------------------------
@@ -3634,7 +3819,7 @@ async def call_remove(interaction: discord.Interaction, user: discord.Member):
             f"🚫 **You were removed from a CoffeeCord call by {interaction.user.display_name}.**\n"
             f"If you think this was a mistake, you can ask them to invite you back."
         )
-    except:
+    except Exception:
         pass
 
     await interaction.response.send_message(f"🚫 Removed {user.mention} from the call.")
@@ -3655,13 +3840,15 @@ async def call_remove(interaction: discord.Interaction, user: discord.Member):
 async def call_end(interaction: discord.Interaction):
     calls = load_calls()
     guild_id = str(interaction.guild.id)
-    call_id, info = get_host_call(calls, guild_id, str(interaction.user.id))
+    info = get_host_call(interaction.guild.id, interaction.user.id)
+    call_id = str(info["channel_id"]) if info else None
     if not info:
         await interaction.response.send_message("❌ You don’t currently host any active call.", ephemeral=True)
         return
 
     channel = interaction.guild.get_channel(int(info["channel_id"]))
     if channel:
+        _cancel_call_empty_timer(channel.id)
         await channel.delete(reason="Call ended by host")
 
     del calls[guild_id][call_id]
@@ -3687,16 +3874,17 @@ async def call_end(interaction: discord.Interaction):
 async def call_promote(interaction: discord.Interaction, user: discord.Member):
     calls = load_calls()
     guild_id = str(interaction.guild.id)
-    call_id, info = get_host_call(calls, guild_id, str(interaction.user.id))
+    info = get_host_call(interaction.guild.id, interaction.user.id)
+    call_id = str(info["channel_id"]) if info else None
     if not info:
         await interaction.response.send_message("❌ You aren’t the host of any active call.", ephemeral=True)
         return
 
-    if str(user.id) not in info["members"]:
+    if user.id not in info["members"]:
         await interaction.response.send_message("❌ That user isn’t in the call.", ephemeral=True)
         return
 
-    info["host_id"] = str(user.id)
+    calls[guild_id][call_id]["host_id"] = str(user.id)
     save_calls(calls)
     await interaction.response.send_message(f"👑 {user.mention} is now the call host!")
     _dispatch_module_log_event(
@@ -4229,6 +4417,7 @@ async def on_error(event, *args, **kwargs):
 async def on_ready():
     try:
         print(f"🤖 Logged in as {bot.user}")
+        _load_reminders_and_timers()
         bot.add_view(VerifyStartView("placeholder"))
 
         # Shared aiohttp session for HTTP requests (dog, cat, level cards, etc.)
@@ -4244,8 +4433,18 @@ async def on_ready():
         _get_automod_module()
         _get_leveling_module()
 
-        synced = await tree.sync()
-        print("Synced:", len(synced))
+        for attempt in range(3):
+            try:
+                synced = await tree.sync()
+                print("Synced:", len(synced))
+                break
+            except (discord.HTTPException, discord.ConnectionError) as e:
+                if attempt < 2:
+                    print(f"[WARN] tree.sync attempt {attempt + 1} failed: {e}, retrying in 2s...")
+                    await asyncio.sleep(2)
+                else:
+                    print(f"[ERROR] tree.sync failed after 3 attempts: {e}")
+                    raise
 
     except Exception as e:
         print("ERROR IN on_ready():")

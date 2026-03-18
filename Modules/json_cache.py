@@ -46,9 +46,12 @@ def get(path: str | Path, default: Any = None) -> Any:
 def set_(path: str | Path, data: Any) -> None:
     """Write JSON to disk and update cache."""
     p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    with p.open("w", encoding="utf-8") as fp:
-        json.dump(data, fp, indent=2, ensure_ascii=True)
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("w", encoding="utf-8") as fp:
+            json.dump(data, fp, indent=2, ensure_ascii=True)
+    except (OSError, IOError, PermissionError, json.JSONEncodeError) as e:
+        raise RuntimeError(f"Failed to save {path}: {e}") from e
     _CACHE[_path_key(path)] = data
 
 

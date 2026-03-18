@@ -14,3 +14,4 @@ Coffeecord supports two command systems: **slash commands** (Discord application
 - [Slash commands](slash-commands.md) — groups, choices, autocomplete, describe
 - [Prefix commands](prefix-commands.md) — bot.command, bot.group
 - [Checks and permissions](checks-and-permissions.md) — has_permissions, owner checks
+- [Permissions reference](permissions.md) — per-command permissions and bot requirements
